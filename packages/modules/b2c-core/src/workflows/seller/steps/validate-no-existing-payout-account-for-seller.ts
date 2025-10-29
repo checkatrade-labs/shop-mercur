@@ -18,7 +18,7 @@ export const validateNoExistingPayoutAccountForSellerStep = createStep(
 
     const { data: sellerPayoutAccountRelations } = await query.graph({
       entity: sellerPayoutAccountLink.entryPoint,
-      fields: ['id'],
+      fields: ['id', 'payout_account.*'],
       filters: { 
         seller_id: input.seller_id,
       }

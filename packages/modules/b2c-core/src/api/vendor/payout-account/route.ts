@@ -62,7 +62,7 @@ export const GET = async (
     ) {
       await syncStripeAccountWorkflow.run({
         container: req.scope,
-        input: sellerPayoutAccount.id,
+        input: sellerPayoutAccount.payout_account.id,
       });
     }
 
@@ -73,7 +73,7 @@ export const GET = async (
       // TODO: implement adyen sync
       await syncStripeAccountWorkflow.run({
         container: req.scope,
-        input: sellerPayoutAccount.id,
+        input: sellerPayoutAccount.payout_account.id,
       });
     }
 

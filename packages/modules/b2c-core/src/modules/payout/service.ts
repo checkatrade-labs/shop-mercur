@@ -42,7 +42,12 @@ class PayoutModuleService extends MedusaService({
     @MedusaContext() sharedContext?: Context<EntityManager>
   ) {
     const result = await this.createPayoutAccounts(
-      { context: params.context, payment_provider_id: params.payment_provider_id, reference_id: "placeholder", data: {} },
+      {
+        context: params.context,
+        payment_provider_id: params.payment_provider_id,
+        reference_id: "placeholder",
+        data: {},
+      },
       sharedContext
     );
 
