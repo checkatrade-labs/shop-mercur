@@ -7,6 +7,13 @@ import { PayoutModuleService } from "../../../modules/payout";
 export const createPayoutAccountStep = createStep(
   "create-payout-account",
   async (input: CreatePayoutAccountDTO, { container }) => {
+
+    console.log("--------------------------------");
+    console.log("input: ", input);
+    console.log("--------------------------------");
+
+    return undefined;
+
     const service = container.resolve<PayoutModuleService>(PAYOUT_MODULE);
 
     const payoutAccount = await service.createPayoutAccount(input);
@@ -14,6 +21,15 @@ export const createPayoutAccountStep = createStep(
     return new StepResponse(payoutAccount, payoutAccount.id);
   },
   async (id: string, { container }) => {
+
+    console.log("--------------------------------");
+    console.log("id: ", id);
+    console.log("container: ", container);
+    console.log("--------------------------------");
+
+    return undefined;
+
+
     if (!id) {
       return;
     }
