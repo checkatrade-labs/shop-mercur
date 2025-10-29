@@ -1,0 +1,10 @@
+import { MedusaNextFunction } from '@medusajs/framework';
+import { MedusaResponse, MiddlewareFunction } from '@medusajs/framework';
+import { MedusaRequest } from '@medusajs/framework';
+/**
+ * Due to Medusa's `unlessPath` function bug, we need to use this function to skip middlewares for particular routes.
+ * @param onPath - Regular expression to match against the base URL
+ * @param middleware - The middleware function to execute
+ * @param methods - Optional array of HTTP methods to match against. If not provided, matches all methods.
+ */
+export declare const unlessBaseUrl: (onPath: RegExp, middleware: MiddlewareFunction, methods?: string[]) => (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => any;

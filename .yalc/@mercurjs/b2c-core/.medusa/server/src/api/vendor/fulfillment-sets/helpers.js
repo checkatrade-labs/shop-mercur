@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.remapSellerServiceZoneQuery = exports.remapServiceZoneFieldsToSellerServiceZone = void 0;
+const remapServiceZoneFieldsToSellerServiceZone = (fields) => {
+    return fields.map((field) => `service_zone.${field}`);
+};
+exports.remapServiceZoneFieldsToSellerServiceZone = remapServiceZoneFieldsToSellerServiceZone;
+const remapSellerServiceZoneQuery = (data) => data.map((it) => it.service_zone);
+exports.remapSellerServiceZoneQuery = remapSellerServiceZoneQuery;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaGVscGVycy5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbIi4uLy4uLy4uLy4uLy4uLy4uL3NyYy9hcGkvdmVuZG9yL2Z1bGZpbGxtZW50LXNldHMvaGVscGVycy50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFFTyxNQUFNLHlDQUF5QyxHQUFHLENBQUMsTUFBZ0IsRUFBRSxFQUFFO0lBQzVFLE9BQU8sTUFBTSxDQUFDLEdBQUcsQ0FBQyxDQUFDLEtBQUssRUFBRSxFQUFFLENBQUMsZ0JBQWdCLEtBQUssRUFBRSxDQUFDLENBQUE7QUFDdkQsQ0FBQyxDQUFBO0FBRlksUUFBQSx5Q0FBeUMsNkNBRXJEO0FBRU0sTUFBTSwyQkFBMkIsR0FBRyxDQUN6QyxJQUF3QyxFQUN4QyxFQUFFLENBQUMsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFDLEVBQUUsRUFBRSxFQUFFLENBQUMsRUFBRSxDQUFDLFlBQVksQ0FBQyxDQUFBO0FBRnpCLFFBQUEsMkJBQTJCLCtCQUVGIn0=

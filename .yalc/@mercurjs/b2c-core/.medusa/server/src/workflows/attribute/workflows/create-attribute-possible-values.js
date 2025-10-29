@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createAttributePossibleValuesWorkflow = void 0;
+const workflows_sdk_1 = require("@medusajs/framework/workflows-sdk");
+const create_attribute_possible_values_1 = require("../steps/create-attribute-possible-values");
+const createAttributePossibleValuesWorkflowId = 'create-attribute-possible-values';
+exports.createAttributePossibleValuesWorkflow = (0, workflows_sdk_1.createWorkflow)(createAttributePossibleValuesWorkflowId, (input) => {
+    const createdValues = (0, create_attribute_possible_values_1.createAttributePossibleValuesStep)(input);
+    return new workflows_sdk_1.WorkflowResponse(createdValues);
+});
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiY3JlYXRlLWF0dHJpYnV0ZS1wb3NzaWJsZS12YWx1ZXMuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyIuLi8uLi8uLi8uLi8uLi8uLi9zcmMvd29ya2Zsb3dzL2F0dHJpYnV0ZS93b3JrZmxvd3MvY3JlYXRlLWF0dHJpYnV0ZS1wb3NzaWJsZS12YWx1ZXMudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7O0FBQUEscUVBRzBDO0FBSTFDLGdHQUE2RjtBQUU3RixNQUFNLHVDQUF1QyxHQUMzQyxrQ0FBa0MsQ0FBQTtBQUt2QixRQUFBLHFDQUFxQyxHQUFHLElBQUEsOEJBQWMsRUFDakUsdUNBQXVDLEVBQ3ZDLENBQUMsS0FBaUQsRUFBRSxFQUFFO0lBQ3BELE1BQU0sYUFBYSxHQUFHLElBQUEsb0VBQWlDLEVBQUMsS0FBSyxDQUFDLENBQUE7SUFFOUQsT0FBTyxJQUFJLGdDQUFnQixDQUFDLGFBQWEsQ0FBQyxDQUFBO0FBQzVDLENBQUMsQ0FDRixDQUFBIn0=
