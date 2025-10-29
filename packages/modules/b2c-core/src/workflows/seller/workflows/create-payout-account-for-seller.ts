@@ -11,8 +11,6 @@ import {
 } from "../steps";
 import { PaymentProvider } from "../../../api/vendor/payout-account/types";
 
-import { MedusaError } from "@medusajs/framework/utils";
-
 type CreatePayoutAccountForSellerInput = {
   context: CreatePayoutAccountDTO["context"];
   seller_id: string;
