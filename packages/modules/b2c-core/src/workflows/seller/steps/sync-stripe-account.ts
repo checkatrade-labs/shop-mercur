@@ -8,7 +8,7 @@ export const syncStripeAccountStep = createStep(
   async (account_id: string, { container }) => {
     const service = container.resolve<PayoutModuleService>(PAYOUT_MODULE);
 
-    const account = await service.syncStripeAccount(account_id);
+    const account = await service.syncPayoutAccount(account_id);
     return new StepResponse(account);
   }
 );

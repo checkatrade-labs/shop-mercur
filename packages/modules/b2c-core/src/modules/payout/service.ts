@@ -18,9 +18,11 @@ import {
   PayoutAccountStatus,
   PayoutWebhookActionPayload,
 } from "@mercurjs/framework";
+import { PaymentProvider } from "../../api/vendor/payout-account/types";
 
 type InjectedDependencies = {
-  payoutProvider: IPayoutProvider;
+  stripePayoutProvider: IPayoutProvider;
+  adyenPayoutProvider: IPayoutProvider;
 };
 
 class PayoutModuleService extends MedusaService({
@@ -29,11 +31,25 @@ class PayoutModuleService extends MedusaService({
   PayoutAccount,
   Onboarding,
 }) {
-  protected provider_: IPayoutProvider;
+  protected providers_: Map<string, IPayoutProvider>;
 
-  constructor({ payoutProvider }: InjectedDependencies) {
+  constructor({ stripePayoutProvider, adyenPayoutProvider }: InjectedDependencies) {
     super(...arguments);
-    this.provider_ = payoutProvider;
+    this.providers_ = new Map([
+      [PaymentProvider.STRIPE_CONNECT, stripePayoutProvider],
+      [PaymentProvider.ADYEN_CONNECT, adyenPayoutProvider],
+    ]);
+  }
+
+  protected getProvider(payment_provider_id: string): IPayoutProvider {
+    const provider = this.providers_.get(payment_provider_id);
+    if (!provider) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Payment provider ${payment_provider_id} not found`
+      );
+    }
+    return provider;
   }
 
   @InjectTransactionManager()
@@ -44,7 +60,7 @@ class PayoutModuleService extends MedusaService({
     const result = await this.createPayoutAccounts(
       {
         context: params.context,
-        payment_provider_id: params.payment_provider_id,
+        payment_provider_id: params.payment_provider_id as PaymentProvider,
         reference_id: "placeholder",
         data: {},
       },
@@ -52,8 +68,9 @@ class PayoutModuleService extends MedusaService({
     );
 
     try {
+      const provider = this.getProvider(params.payment_provider_id);
       const { data, id: referenceId } =
-        await this.provider_.createPayoutAccount({
+        await provider.createPayoutAccount({
           context: params.context,
           payment_provider_id: params.payment_provider_id,
           account_id: result.id,
@@ -81,29 +98,50 @@ class PayoutModuleService extends MedusaService({
   }
 
   @InjectTransactionManager()
-  async syncStripeAccount(
+  async syncPayoutAccount(
     account_id: string,
     @MedusaContext() sharedContext?: Context<EntityManager>
   ) {
     const payout_account = await this.retrievePayoutAccount(account_id);
-    const stripe_account = await this.provider_.getAccount(
+
+    if (!payout_account.payment_provider_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Payout account missing payment_provider_id"
+      );
+    }
+
+    const provider = this.getProvider(payout_account.payment_provider_id);
+    const account_data = await provider.getAccount(
       payout_account.reference_id
     );
 
-    const status =
-      stripe_account.details_submitted &&
-      stripe_account.payouts_enabled &&
-      stripe_account.charges_enabled &&
-      stripe_account.tos_acceptance &&
-      stripe_account.tos_acceptance?.date !== null;
+    // Provider-specific status logic
+    let status = PayoutAccountStatus.PENDING;
+
+    // For Stripe
+    if (payout_account.payment_provider_id === PaymentProvider.STRIPE_CONNECT) {
+      const stripe_account = account_data as any;
+      status =
+        stripe_account.details_submitted &&
+        stripe_account.payouts_enabled &&
+        stripe_account.charges_enabled &&
+        stripe_account.tos_acceptance &&
+        stripe_account.tos_acceptance?.date !== null
+          ? PayoutAccountStatus.ACTIVE
+          : PayoutAccountStatus.PENDING;
+    }
+    // For Adyen - implement status logic when ready
+    else if (payout_account.payment_provider_id === PaymentProvider.ADYEN_CONNECT) {
+      // TODO: Implement Adyen-specific status logic
+      status = PayoutAccountStatus.PENDING;
+    }
 
     await this.updatePayoutAccounts(
       {
         id: account_id,
-        data: stripe_account as unknown as Record<string, unknown>,
-        status: status
-          ? PayoutAccountStatus.ACTIVE
-          : PayoutAccountStatus.PENDING,
+        data: account_data,
+        status,
       },
       sharedContext
     );
@@ -126,7 +164,15 @@ class PayoutModuleService extends MedusaService({
     });
     const account = await this.retrievePayoutAccount(payout_account_id);
 
-    const { data: providerData } = await this.provider_.initializeOnboarding(
+    if (!account.payment_provider_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Payout account missing payment_provider_id"
+      );
+    }
+
+    const provider = this.getProvider(account.payment_provider_id);
+    const { data: providerData } = await provider.initializeOnboarding(
       account.reference_id!,
       context
     );
@@ -172,7 +218,15 @@ class PayoutModuleService extends MedusaService({
 
     const payoutAccount = await this.retrievePayoutAccount(account_id);
 
-    const { data } = await this.provider_.createPayout({
+    if (!payoutAccount.payment_provider_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Payout account missing payment_provider_id"
+      );
+    }
+
+    const provider = this.getProvider(payoutAccount.payment_provider_id);
+    const { data } = await provider.createPayout({
       account_reference_id: payoutAccount.reference_id,
       amount,
       currency: currency_code,
@@ -199,15 +253,25 @@ class PayoutModuleService extends MedusaService({
     input: CreatePayoutReversalDTO,
     @MedusaContext() sharedContext?: Context<EntityManager>
   ) {
-    const payout = await this.retrievePayout(input.payout_id);
+    const payout = await this.retrievePayout(input.payout_id, {
+      relations: ["payout_account"],
+    });
 
     if (!payout || !payout.data || !payout.data.id) {
       throw new MedusaError(MedusaError.Types.NOT_FOUND, "Payout not found");
     }
 
+    if (!payout.payout_account?.payment_provider_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Payout account missing payment_provider_id"
+      );
+    }
+
     const transfer_id = payout.data.id as string;
 
-    const transferReversal = await this.provider_.reversePayout({
+    const provider = this.getProvider(payout.payout_account.payment_provider_id);
+    const transferReversal = await provider.reversePayout({
       transfer_id,
       amount: input.amount,
       currency: input.currency_code,
@@ -227,8 +291,12 @@ class PayoutModuleService extends MedusaService({
     return payoutReversal;
   }
 
-  async getWebhookActionAndData(input: PayoutWebhookActionPayload) {
-    return await this.provider_.getWebhookActionAndData(input);
+  async getWebhookActionAndData(
+    payment_provider_id: string,
+    input: PayoutWebhookActionPayload
+  ) {
+    const provider = this.getProvider(payment_provider_id);
+    return await provider.getWebhookActionAndData(input);
   }
 }
 
