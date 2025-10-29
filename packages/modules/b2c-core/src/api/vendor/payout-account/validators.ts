@@ -21,6 +21,7 @@ export type VendorCreatePayoutAccountType = z.infer<
  */
 export const VendorCreatePayoutAccount = z
   .object({
+    payment_provider_id: z.string(),
     context: z.record(z.unknown()).optional()
   })
   .strict()

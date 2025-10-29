@@ -1,13 +1,17 @@
-import { AuthenticatedMedusaRequest, MedusaResponse } from '@medusajs/framework'
-import { ContainerRegistrationKeys } from '@medusajs/framework/utils'
+import {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework";
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils";
 
-import { fetchSellerByAuthActorId } from '../../../shared/infra/http/utils'
+import { fetchSellerByAuthActorId } from "../../../shared/infra/http/utils";
 import {
   createPayoutAccountForSellerWorkflow,
-  syncStripeAccountWorkflow
-} from '../../../workflows/seller/workflows'
-import { refetchPayoutAccount } from './utils'
-import { VendorCreatePayoutAccountType } from './validators'
+  syncStripeAccountWorkflow,
+} from "../../../workflows/seller/workflows";
+import { refetchPayoutAccount } from "./utils";
+import { VendorCreatePayoutAccountType } from "./validators";
+import { PaymentProvider } from "./types";
 
 /**
  * @oas [get] /vendor/payout-account
@@ -41,31 +45,49 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  let { payout_account } = await refetchPayoutAccount(
+  let sellerPayoutAccounts = await refetchPayoutAccount(
     req.scope,
     req.queryConfig.fields.map((field) => `payout_account.${field}`),
     req.filterableFields
-  )
+  );
 
-  if (payout_account.status !== 'active') {
-    await syncStripeAccountWorkflow.run({
-      container: req.scope,
-      input: payout_account.id
-    })
+  for (const sellerPayoutAccount of sellerPayoutAccounts) {
+    if (sellerPayoutAccount.payout_account?.status === "active") {
+      continue;
+    }
 
-    const refreshed = await refetchPayoutAccount(
+    if (
+      sellerPayoutAccount.payout_account?.payment_provider_id ===
+      PaymentProvider.STRIPE_CONNECT
+    ) {
+      await syncStripeAccountWorkflow.run({
+        container: req.scope,
+        input: sellerPayoutAccount.id,
+      });
+    }
+
+    if (
+      sellerPayoutAccount.payout_account?.payment_provider_id ===
+      PaymentProvider.ADYEN_CONNECT
+    ) {
+      // TODO: implement adyen sync
+      await syncStripeAccountWorkflow.run({
+        container: req.scope,
+        input: sellerPayoutAccount.id,
+      });
+    }
+
+    sellerPayoutAccounts = await refetchPayoutAccount(
       req.scope,
       req.queryConfig.fields.map((field) => `payout_account.${field}`),
       req.filterableFields
-    )
-
-    payout_account = refreshed.payout_account
+    );
   }
 
   res.json({
-    payout_account
-  })
-}
+    payout_accounts: sellerPayoutAccounts.map((spa) => spa.payout_account),
+  });
+};
 
 /**
  * @oas [post] /vendor/payout-account
@@ -98,34 +120,35 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<VendorCreatePayoutAccountType>,
   res: MedusaResponse
 ) => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
   const seller = await fetchSellerByAuthActorId(
     req.auth_context.actor_id,
     req.scope
-  )
+  );
 
   const { result } = await createPayoutAccountForSellerWorkflow(req.scope).run({
     context: { transactionId: seller.id },
     input: {
+      payment_provider_id: req.validatedBody.payment_provider_id as PaymentProvider,
       seller_id: seller.id,
-      context: req.validatedBody.context ?? {}
-    }
-  })
+      context: req.validatedBody.context ?? {},
+    },
+  });
 
   const {
-    data: [payoutAccount]
+    data: [payoutAccount],
   } = await query.graph(
     {
-      entity: 'payout_account',
+      entity: "payout_account",
       fields: req.queryConfig.fields,
       filters: {
-        id: result.id
-      }
+        id: result.id,
+      },
     },
     { throwIfKeyNotFound: true }
-  )
+  );
 
   res.status(201).json({
-    payout_account: payoutAccount
-  })
-}
+    payout_account: payoutAccount,
+  });
+};

@@ -9,10 +9,12 @@ import {
   createPayoutAccountStep,
   validateNoExistingPayoutAccountForSellerStep,
 } from "../steps";
+import { PaymentProvider } from "../../../api/vendor/payout-account/types";
 
 type CreatePayoutAccountForSellerInput = {
   context: CreatePayoutAccountDTO["context"];
   seller_id: string;
+  payment_provider_id: PaymentProvider;
 };
 
 export const createPayoutAccountForSellerWorkflow = createWorkflow(
