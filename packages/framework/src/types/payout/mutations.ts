@@ -3,6 +3,7 @@ import { BigNumberInput } from '@medusajs/framework/types'
 import { OnboardingDTO, PayoutAccountDTO } from './common'
 
 export interface CreatePayoutAccountDTO {
+  payment_provider_id: string;
   context: Record<string, unknown>
 }
 

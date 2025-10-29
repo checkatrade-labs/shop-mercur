@@ -38,18 +38,19 @@ class PayoutModuleService extends MedusaService({
 
   @InjectTransactionManager()
   async createPayoutAccount(
-    { context }: CreatePayoutAccountDTO,
+    params: CreatePayoutAccountDTO,
     @MedusaContext() sharedContext?: Context<EntityManager>
   ) {
     const result = await this.createPayoutAccounts(
-      { context, reference_id: "placeholder", data: {} },
+      { context: params.context, payment_provider_id: params.payment_provider_id, reference_id: "placeholder", data: {} },
       sharedContext
     );
 
     try {
       const { data, id: referenceId } =
         await this.provider_.createPayoutAccount({
-          context,
+          context: params.context,
+          payment_provider_id: params.payment_provider_id,
           account_id: result.id,
         });
 

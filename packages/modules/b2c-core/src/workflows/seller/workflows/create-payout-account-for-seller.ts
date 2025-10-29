@@ -27,10 +27,18 @@ export const createPayoutAccountForSellerWorkflow = createWorkflow(
   function (input: CreatePayoutAccountForSellerInput) {
     validateNoExistingPayoutAccountForSellerStep({
       seller_id: input.seller_id,
-      payment_provider_id: input.payment_provider_id
+      payment_provider_id: input.payment_provider_id,
     });
 
-    const payoutAccount = createPayoutAccountStep({ context: input.context });
+    const payoutAccount = createPayoutAccountStep({
+      context: input.context,
+      payment_provider_id: input.payment_provider_id,
+    });
+
+    console.log("--------------------------------");
+    console.log("input.seller_id: ", input.seller_id.toString());
+    console.log("payoutAccount: ", payoutAccount.toString());
+    console.log("--------------------------------");
 
     createRemoteLinkStep([
       {

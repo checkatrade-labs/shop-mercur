@@ -23,6 +23,7 @@ export type ProcessPayoutResponse = {
 }
 
 export type CreatePayoutAccountInput = {
+  payment_provider_id: string;
   context: Record<string, unknown>
   account_id: string
 }
