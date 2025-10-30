@@ -131,10 +131,21 @@ class PayoutModuleService extends MedusaService({
           ? PayoutAccountStatus.ACTIVE
           : PayoutAccountStatus.PENDING;
     }
-    // For Adyen - implement status logic when ready
+    // For Adyen
     else if (payout_account.payment_provider_id === PaymentProvider.ADYEN_CONNECT) {
-      // TODO: Implement Adyen-specific status logic
-      status = PayoutAccountStatus.PENDING;
+      const adyen_entity = account_data as any;
+      // Check if legal entity has required capabilities and verification
+      // capabilities can include: receivePayments, sendPayments, receiveFromBalanceAccount, sendToBalanceAccount
+      const hasPayoutCapability = adyen_entity.capabilities?.sendPayments?.enabled === true ||
+                                   adyen_entity.capabilities?.sendToBalanceAccount?.enabled === true;
+
+      // Check verification status - legal entity should be verified
+      const isVerified = adyen_entity.verificationStatus === "valid" ||
+                         adyen_entity.verificationStatus === "verified";
+
+      status = hasPayoutCapability && isVerified
+        ? PayoutAccountStatus.ACTIVE
+        : PayoutAccountStatus.PENDING;
     }
 
     await this.updatePayoutAccounts(

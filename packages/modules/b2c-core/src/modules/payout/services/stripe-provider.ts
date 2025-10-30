@@ -104,7 +104,6 @@ export class StripePayoutProvider implements IPayoutProvider {
         );
       }
 
-
       const account = await this.client_.accounts.create({
         country: country as string,
         type: "standard",
@@ -112,6 +111,8 @@ export class StripePayoutProvider implements IPayoutProvider {
           account_id,
         },
       });
+
+      this.logger_.info(`[Stripe] Account created: ${account.id}`);
 
       return {
         data: account as unknown as Record<string, unknown>,
@@ -172,7 +173,9 @@ export class StripePayoutProvider implements IPayoutProvider {
     }
   }
 
-  async reversePayout(input: ReversePayoutInput): Promise<Record<string, unknown>> {
+  async reversePayout(
+    input: ReversePayoutInput
+  ): Promise<Record<string, unknown>> {
     try {
       const reversal = await this.client_.transfers.createReversal(
         input.transfer_id,
