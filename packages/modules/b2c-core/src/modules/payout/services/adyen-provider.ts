@@ -114,7 +114,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
   async createPayoutAccount({
     payment_provider_id,
     context,
-    account_id,
+    account_id: legal_entity_id,
   }: CreatePayoutAccountInput): Promise<CreatePayoutAccountResponse> {
     let legalEntity: Types.legalEntityManagement.LegalEntity | undefined;
     let accountHolder: Types.balancePlatform.AccountHolder | undefined;
@@ -135,10 +135,10 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       legalEntity =
         await this.legalEntityApi_.LegalEntitiesApi.createLegalEntity({
           type: LegalEntityInfoRequiredType.TypeEnum.Organization,
-          reference: account_id, // Store our account_id as reference
+          reference: legal_entity_id,
           organization: {
             legalName: context.legal_name as string,
-            description: `Legal entity for ${context.legal_name as string} on account ${account_id}`,
+            description: `Legal entity for ${context.legal_name as string} on account ${legal_entity_id}`,
             phone: {
               phoneCountryCode: context.country_code as string,
               number: context.phone_number as string,
@@ -160,8 +160,8 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         await this.balancePlatformApi_.AccountHoldersApi.createAccountHolder({
           legalEntityId: legalEntity.id,
           description: `Account holder for ${context.legal_name as string}`,
-          reference: account_id,
-          // TODO: request capabilities
+          reference: legal_entity_id,
+          // TODO: request capabilities if needed
           // capabilities: {},
         });
 
@@ -171,7 +171,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         await this.balancePlatformApi_.BalanceAccountsApi.createBalanceAccount({
           accountHolderId: accountHolder.id!,
           description: `Balance account for ${context.legal_name as string}`,
-          reference: account_id,
+          reference: legal_entity_id,
         });
 
       this.logger_.info(
@@ -204,7 +204,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         },
         phoneNumber: context.phone_number as string,
         shopperStatement: (context.legal_name as string).slice(0, 22),
-        reference: account_id,
+        reference: legal_entity_id,
       });
 
       this.logger_.info(`[Adyen] Store created: ${store.id}`);
@@ -319,10 +319,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
 
       const legalEntity =
         await this.legalEntityApi_.LegalEntitiesApi.getLegalEntity(accountId);
-
-      console.log("--------------------------------");
-      console.log("legalEntity: ", legalEntity);
-      console.log("--------------------------------");
 
       this.logger_.info(`[Adyen] Legal entity retrieved: ${legalEntity.id}`);
 
