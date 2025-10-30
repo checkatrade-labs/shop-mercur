@@ -97,15 +97,6 @@ export class StripePayoutProvider implements IPayoutProvider {
       const { country } = context;
       this.logger_.info("Creating payment profile");
 
-
-
-      // TODO:
-      // Create payment account based on payment provider id
-      // if it's stripe, use stripe's client
-      // if it's adyen, use adyen's client
-
-     
-
       if (!isPresent(country)) {
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
@@ -113,9 +104,6 @@ export class StripePayoutProvider implements IPayoutProvider {
         );
       }
 
-      console.log("--------------------------------");
-      console.log("creating payout account for country: ", country);
-      console.log("--------------------------------");
 
       const account = await this.client_.accounts.create({
         country: country as string,

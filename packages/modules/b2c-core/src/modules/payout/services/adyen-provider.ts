@@ -21,9 +21,14 @@ type InjectedDependencies = {
 };
 
 type AdyenConnectConfig = {
-  apiKey: string;
-  webhookSecret: string;
-  // Add other Adyen-specific config as needed
+  adyenMerchantAccount: string;
+  adyenThemeId: string;
+  adyenPaymentApiKey: string;
+  adyenPlatformApiKey: string;
+  adyenLegalApiKey: string;
+  adyenUrlPrefix: string;
+  adyenEnvironment: string;
+  adyenHmacSecret: string;
 };
 
 export class AdyenPayoutProvider implements IPayoutProvider {
@@ -38,8 +43,14 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     const moduleDef = configModule.modules?.[PAYOUT_MODULE];
     if (typeof moduleDef !== "boolean" && moduleDef?.options) {
       this.config_ = {
-        apiKey: process.env.ADYEN_API_KEY as string,
-        webhookSecret: process.env.ADYEN_WEBHOOK_SECRET as string,
+        adyenMerchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT as string,
+        adyenThemeId: process.env.ADYEN_THEME_ID as string,
+        adyenPaymentApiKey: process.env.ADYEN_PAYMENT_API_KEY as string,
+        adyenPlatformApiKey: process.env.ADYEN_PLATFORM_API_KEY as string,
+        adyenLegalApiKey: process.env.ADYEN_LEGAL_API_KEY as string,
+        adyenUrlPrefix: process.env.ADYEN_URL_PREFIX as string,
+        adyenEnvironment: process.env.ADYEN_ENVIRONMENT as string,
+        adyenHmacSecret: process.env.ADYEN_HMAC_SECRET as string,
       };
     }
 
