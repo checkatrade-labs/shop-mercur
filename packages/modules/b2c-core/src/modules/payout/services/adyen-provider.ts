@@ -285,7 +285,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       // Create an onboarding link for the legal entity
       const onboardingLinkRequest: OnboardingLinkInfo = {
         themeId: this.config_.adyenThemeId, // Your Adyen theme ID for branding
-        locale: "en-GB",
+        locale: "en",
         redirectUrl: context.return_url as string,
       };
 
@@ -319,6 +319,10 @@ export class AdyenPayoutProvider implements IPayoutProvider {
 
       const legalEntity =
         await this.legalEntityApi_.LegalEntitiesApi.getLegalEntity(accountId);
+
+      console.log("--------------------------------");
+      console.log("legalEntity: ", legalEntity);
+      console.log("--------------------------------");
 
       this.logger_.info(`[Adyen] Legal entity retrieved: ${legalEntity.id}`);
 

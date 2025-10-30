@@ -50,35 +50,16 @@ export const GET = async (
     req.queryConfig.fields.map((field) => `payout_account.${field}`),
     req.filterableFields
   );
-  
-  console.log("--------------------------------");
-  console.log("sellerPayoutAccounts: ", sellerPayoutAccounts);
-  console.log("--------------------------------");
 
   for (const sellerPayoutAccount of sellerPayoutAccounts) {
     if (sellerPayoutAccount.payout_account?.status === "active") {
       continue;
     }
 
-    if (
-      sellerPayoutAccount.payout_account?.payment_provider_id ===
-      PaymentProvider.STRIPE_CONNECT
-    ) {
-      await syncPayoutAccountWorkflow.run({
-        container: req.scope,
-        input: sellerPayoutAccount.payout_account.id,
-      });
-    }
-
-    if (
-      sellerPayoutAccount.payout_account?.payment_provider_id ===
-      PaymentProvider.ADYEN_CONNECT
-    ) {
-      await syncPayoutAccountWorkflow.run({
-        container: req.scope,
-        input: sellerPayoutAccount.payout_account.id,
-      });
-    }
+    await syncPayoutAccountWorkflow.run({
+      container: req.scope,
+      input: sellerPayoutAccount.payout_account.id,
+    });
 
     sellerPayoutAccounts = await refetchPayoutAccount(
       req.scope,
@@ -132,7 +113,8 @@ export const POST = async (
   const { result } = await createPayoutAccountForSellerWorkflow(req.scope).run({
     context: { transactionId: seller.id },
     input: {
-      payment_provider_id: req.validatedBody.payment_provider_id as PaymentProvider,
+      payment_provider_id: req.validatedBody
+        .payment_provider_id as PaymentProvider,
       seller_id: seller.id,
       context: req.validatedBody.context ?? {},
     },

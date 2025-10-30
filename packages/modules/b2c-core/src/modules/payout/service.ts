@@ -1,4 +1,5 @@
 import { EntityManager } from "@mikro-orm/knex";
+import { Types } from "@adyen/api-library";
 
 import { Context } from "@medusajs/framework/types";
 import {
@@ -33,7 +34,10 @@ class PayoutModuleService extends MedusaService({
 }) {
   protected providers_: Map<string, IPayoutProvider>;
 
-  constructor({ stripePayoutProvider, adyenPayoutProvider }: InjectedDependencies) {
+  constructor({
+    stripePayoutProvider,
+    adyenPayoutProvider,
+  }: InjectedDependencies) {
     super(...arguments);
     this.providers_ = new Map([
       [PaymentProvider.STRIPE_CONNECT, stripePayoutProvider],
@@ -69,12 +73,11 @@ class PayoutModuleService extends MedusaService({
 
     try {
       const provider = this.getProvider(params.payment_provider_id);
-      const { data, id: referenceId } =
-        await provider.createPayoutAccount({
-          context: params.context,
-          payment_provider_id: params.payment_provider_id,
-          account_id: result.id,
-        });
+      const { data, id: referenceId } = await provider.createPayoutAccount({
+        context: params.context,
+        payment_provider_id: params.payment_provider_id,
+        account_id: result.id,
+      });
 
       await this.updatePayoutAccounts(
         {
@@ -112,9 +115,7 @@ class PayoutModuleService extends MedusaService({
     }
 
     const provider = this.getProvider(payout_account.payment_provider_id);
-    const account_data = await provider.getAccount(
-      payout_account.reference_id
-    );
+    const account_data = await provider.getAccount(payout_account.reference_id);
 
     // Provider-specific status logic
     let status = PayoutAccountStatus.PENDING;
@@ -132,18 +133,23 @@ class PayoutModuleService extends MedusaService({
           : PayoutAccountStatus.PENDING;
     }
     // For Adyen
-    else if (payout_account.payment_provider_id === PaymentProvider.ADYEN_CONNECT) {
-      const adyen_entity = account_data as any;
-      // Check if legal entity has required capabilities and verification
-      // capabilities can include: receivePayments, sendPayments, receiveFromBalanceAccount, sendToBalanceAccount
-      const hasPayoutCapability = adyen_entity.capabilities?.sendPayments?.enabled === true ||
-                                   adyen_entity.capabilities?.sendToBalanceAccount?.enabled === true;
+    else if (
+      payout_account.payment_provider_id === PaymentProvider.ADYEN_CONNECT
+    ) {
+      const adyen_entity =
+        account_data as unknown as Types.legalEntityManagement.LegalEntity;
 
-      // Check verification status - legal entity should be verified
-      const isVerified = adyen_entity.verificationStatus === "valid" ||
-                         adyen_entity.verificationStatus === "verified";
+      const hasPayoutCapability =
+        adyen_entity.capabilities?.sendToTransferInstrument.allowed === true &&
+        adyen_entity.capabilities?.receiveFromTransferInstrument.allowed ===
+          true &&
+        adyen_entity.capabilities?.sendToBalanceAccount.allowed === true &&
+        adyen_entity.capabilities?.receivePayments.allowed === true &&
+        adyen_entity.capabilities?.receiveFromPlatformPayments.allowed ===
+          true &&
+        adyen_entity.capabilities?.receiveFromBalanceAccount.allowed === true;
 
-      status = hasPayoutCapability && isVerified
+      status = hasPayoutCapability
         ? PayoutAccountStatus.ACTIVE
         : PayoutAccountStatus.PENDING;
     }
@@ -281,7 +287,9 @@ class PayoutModuleService extends MedusaService({
 
     const transfer_id = payout.data.id as string;
 
-    const provider = this.getProvider(payout.payout_account.payment_provider_id);
+    const provider = this.getProvider(
+      payout.payout_account.payment_provider_id
+    );
     const transferReversal = await provider.reversePayout({
       transfer_id,
       amount: input.amount,
