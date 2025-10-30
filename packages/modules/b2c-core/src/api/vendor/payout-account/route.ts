@@ -7,7 +7,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils";
 import { fetchSellerByAuthActorId } from "../../../shared/infra/http/utils";
 import {
   createPayoutAccountForSellerWorkflow,
-  syncStripeAccountWorkflow,
+  syncPayoutAccountWorkflow,
 } from "../../../workflows/seller/workflows";
 import { refetchPayoutAccount } from "./utils";
 import { VendorCreatePayoutAccountType } from "./validators";
@@ -50,6 +50,10 @@ export const GET = async (
     req.queryConfig.fields.map((field) => `payout_account.${field}`),
     req.filterableFields
   );
+  
+  console.log("--------------------------------");
+  console.log("sellerPayoutAccounts: ", sellerPayoutAccounts);
+  console.log("--------------------------------");
 
   for (const sellerPayoutAccount of sellerPayoutAccounts) {
     if (sellerPayoutAccount.payout_account?.status === "active") {
@@ -60,7 +64,7 @@ export const GET = async (
       sellerPayoutAccount.payout_account?.payment_provider_id ===
       PaymentProvider.STRIPE_CONNECT
     ) {
-      await syncStripeAccountWorkflow.run({
+      await syncPayoutAccountWorkflow.run({
         container: req.scope,
         input: sellerPayoutAccount.payout_account.id,
       });
@@ -70,8 +74,7 @@ export const GET = async (
       sellerPayoutAccount.payout_account?.payment_provider_id ===
       PaymentProvider.ADYEN_CONNECT
     ) {
-      // TODO: implement adyen sync
-      await syncStripeAccountWorkflow.run({
+      await syncPayoutAccountWorkflow.run({
         container: req.scope,
         input: sellerPayoutAccount.payout_account.id,
       });

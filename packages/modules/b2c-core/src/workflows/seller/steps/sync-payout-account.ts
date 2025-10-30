@@ -3,8 +3,8 @@ import { StepResponse, createStep } from "@medusajs/framework/workflows-sdk";
 import { PAYOUT_MODULE } from "../../../modules/payout";
 import { PayoutModuleService } from "../../../modules/payout";
 
-export const syncStripeAccountStep = createStep(
-  "sync-stripe-account",
+export const syncPayoutAccountStep = createStep(
+  "sync-payout-account",
   async (account_id: string, { container }) => {
     const service = container.resolve<PayoutModuleService>(PAYOUT_MODULE);
 
