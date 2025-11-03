@@ -1,5 +1,7 @@
-//@ts-nocheck
 import Stripe from "stripe";
+import { CheckoutAPI, EnvironmentEnum } from "@adyen/api-library";
+import { Client } from "@adyen/api-library";
+import { CreateCheckoutSessionRequest } from "@adyen/api-library/lib/src/typings/checkout/models";
 
 import {
   ProviderWebhookPayload,
@@ -44,18 +46,34 @@ import {
 type Options = {
   apiKey: string;
   webhookSecret: string;
+
+  adyenMerchantAccount: string;
+  adyenThemeId: string;
+  adyenPaymentApiKey: string;
+  adyenPlatformApiKey: string;
+  adyenLegalApiKey: string;
+  adyenUrlPrefix: string;
+  adyenEnvironment: EnvironmentEnum;
+  adyenHmacSecret: string;
 };
 
 abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   private readonly options_: Options;
-  private readonly client_: Stripe;
+  private readonly client_: Client;
+  private readonly client2_: Stripe;
 
   constructor(container, options: Options) {
     super(container);
 
     this.options_ = options;
 
-    this.client_ = new Stripe(options.apiKey);
+    this.client_ = new Client({
+      apiKey: options.adyenPaymentApiKey,
+      environment: options.adyenEnvironment,
+      liveEndpointUrlPrefix: options.adyenUrlPrefix,
+    });
+
+    this.client2_ = new Stripe(options.apiKey);
   }
 
   abstract get paymentIntentOptions(): PaymentIntentOptions;
@@ -64,7 +82,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
     const id = input.data?.id as string;
-    const paymentIntent = await this.client_.paymentIntents.retrieve(id);
+    const paymentIntent = await this.client2_.paymentIntents.retrieve(id);
     const dataResponse = paymentIntent as unknown as Record<string, unknown>;
 
     switch (paymentIntent.status) {
@@ -101,52 +119,19 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
       amount: getSmallestUnit(amount, currency_code),
     };
 
-    // revisit when you could update customer using initiatePayment
-    try {
-      const {
-        data: [customer],
-      } = await this.client_.customers.list({
-        email,
-        limit: 1,
-      });
+    console.log("--------------------------------");
+    console.log("input", input);
+    console.log("paymentIntentInput", paymentIntentInput);
+    console.log("--------------------------------");
 
-      if (customer) {
-        paymentIntentInput.customer = customer.id;
-      }
-    } catch (error) {
-      throw this.buildError(
-        "An error occurred in initiatePayment when retrieving a Stripe customer",
-        error
-      );
-    }
+    const checkoutAPI = new CheckoutAPI(this.client_);
 
-    if (!paymentIntentInput.customer) {
-      try {
-        const customer = await this.client_.customers.create({ email });
-        paymentIntentInput.customer = customer.id;
-      } catch (error) {
-        throw this.buildError(
-          "An error occurred in initiatePayment when creating a Stripe customer",
-          error
-        );
-      }
-    }
+    
 
-    try {
-      const data = (await this.client_.paymentIntents.create(
-        paymentIntentInput
-      )) as any;
-
-      return {
-        id: data.id,
-        data,
-      };
-    } catch (error) {
-      throw this.buildError(
-        "An error occurred in initiatePayment when creating a Stripe payment intent",
-        error
-      );
-    }
+    return {
+      id: "",
+      data: {} as unknown as Record<string, unknown>,
+    };
   }
 
   async authorizePayment(
@@ -170,7 +155,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
         return { data: paymentSessionData };
       }
 
-      const data = (await this.client_.paymentIntents.cancel(id)) as any;
+      const data = (await this.client2_.paymentIntents.cancel(id)) as any;
       return { data };
     } catch (error) {
       throw this.buildError("An error occurred in cancelPayment", error);
@@ -182,7 +167,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   }: CapturePaymentInput): Promise<CapturePaymentOutput> {
     const id = paymentSessionData?.id as string;
     try {
-      const data = (await this.client_.paymentIntents.capture(id)) as any;
+      const data = (await this.client2_.paymentIntents.capture(id)) as any;
       return { data };
     } catch (error) {
       if (error.code === ErrorCodes.PAYMENT_INTENT_UNEXPECTED_STATE) {
@@ -206,7 +191,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
 
     try {
       const currency = paymentSessionData?.currency as string;
-      await this.client_.refunds.create({
+      await this.client2_.refunds.create({
         amount: getSmallestUnit(amount, currency),
         payment_intent: id as string,
       });
@@ -222,7 +207,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   }: RetrievePaymentInput): Promise<RetrievePaymentOutput> {
     try {
       const id = paymentSessionData?.id as string;
-      const intent = (await this.client_.paymentIntents.retrieve(id)) as any;
+      const intent = (await this.client2_.paymentIntents.retrieve(id)) as any;
 
       intent.amount = getAmountFromSmallestUnit(intent.amount, intent.currency);
       console.log("Stripe - retrieving", intent);
@@ -243,7 +228,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
 
     try {
       const id = data?.id as string;
-      const sessionData = (await this.client_.paymentIntents.update(id, {
+      const sessionData = (await this.client2_.paymentIntents.update(id, {
         amount: amountNumeric,
       })) as any;
 
@@ -264,7 +249,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
         );
       }
 
-      return (await this.client_.paymentIntents.update(sessionId, {
+      return (await this.client2_.paymentIntents.update(sessionId, {
         ...data,
       })) as any;
     } catch (e) {
@@ -315,7 +300,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   constructWebhookEvent(data: ProviderWebhookPayload["payload"]): Stripe.Event {
     const signature = data.headers["stripe-signature"] as string;
 
-    return this.client_.webhooks.constructEvent(
+    return this.client2_.webhooks.constructEvent(
       data.rawData as string | Buffer,
       signature,
       this.options_.webhookSecret

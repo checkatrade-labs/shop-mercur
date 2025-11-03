@@ -15,6 +15,7 @@ import {
   ProcessPayoutInput,
   ProcessPayoutResponse,
   ReversePayoutInput,
+  getSmallestUnit,
 } from "@mercurjs/framework";
 
 import {
@@ -25,6 +26,7 @@ import {
   ManagementAPI,
   DataProtectionAPI,
   Types,
+  TransfersAPI,
 } from "@adyen/api-library";
 
 type InjectedDependencies = {
@@ -50,6 +52,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
   protected readonly balancePlatformApi_: BalancePlatformAPI;
   protected readonly managementApi_: ManagementAPI;
   protected readonly dataProtectionApi_: DataProtectionAPI;
+  protected readonly transfersApi_: TransfersAPI;
 
   constructor({ logger, configModule }: InjectedDependencies) {
     this.logger_ = logger;
@@ -100,16 +103,47 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     transaction_id,
     source_transaction,
   }: ProcessPayoutInput): Promise<ProcessPayoutResponse> {
-    // TODO: Implement Adyen payout creation
-    this.logger_.info(
-      `[Adyen] Processing payout for transaction with ID ${transaction_id}`
-    );
+    try {
+      this.logger_.info(
+        `[Adyen] Processing payout for transaction with ID ${transaction_id}`
+      );
 
-    throw new MedusaError(
-      MedusaError.Types.NOT_ALLOWED,
-      "Adyen createPayout not yet implemented"
-    );
+      // const transfer = await this.transfersApi_.TransfersApi.transferFunds(
+      //   {
+      //     amount: {
+      //       currency: currency,
+      //       value: getSmallestUnit(amount, currency),
+      //     },
+      //     // category: Types.balancePlatform.Transfer.CategoryEnum.Bank,
+      //     counterparty: {
+      //       balanceAccountId: account_reference_id,
+      //     },
+      //     description: `Payout for transaction ${transaction_id}`,
+      //   },
+      //   { idempotencyKey: transaction_id }
+      // );
+
+      // this.logger_.info(`[Adyen] Transfer created: ${transfer.id}`);
+
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "Adyen createPayout not yet implemented"
+      );
+      
+      return {
+        data: {} as unknown as Record<string, unknown>,
+        // data: transfer as unknown as Record<string, unknown>,
+      };
+    } catch (error) {
+      this.logger_.error("[Adyen] Error occurred while creating payout", error);
+
+      const message = error?.message ?? "Error occurred while creating payout";
+
+      throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, message);
+    }
   }
+
+
 
   async createPayoutAccount({
     payment_provider_id,
