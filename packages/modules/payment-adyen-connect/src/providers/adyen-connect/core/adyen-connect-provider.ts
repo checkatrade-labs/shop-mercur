@@ -96,10 +96,19 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   ): Promise<InitiatePaymentOutput> {
     const { amount, currency_code, data } = input;
 
+    // FIXME: Better approach is to get seller's payout account using cart_id from the database,
+    // instead of using the data object received from the client.
+    if (!data?.seller_payout_account_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "seller_payout_account_id is required"
+      );
+    }
+
     const session = await this.checkoutAPI_.PaymentsApi.sessions({
       merchantAccount: this.options_.adyenMerchantAccount,
       reference: input.context?.idempotency_key as string,
-      store: "12afad4c-12f5-4a3d-a4a6-5bb4a35e229a", // TODO: Store should be passed as a parameter dynamically
+      store: data?.seller_payout_account_id as string,
       allowedPaymentMethods: this.allowedPaymentMethods,
       amount: {
         value: getSmallestUnit(amount, currency_code),
