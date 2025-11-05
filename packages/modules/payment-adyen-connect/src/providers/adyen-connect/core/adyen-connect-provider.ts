@@ -1,7 +1,4 @@
-import {
-  CheckoutAPI,
-  EnvironmentEnum,
-} from "@adyen/api-library";
+import { CheckoutAPI, EnvironmentEnum } from "@adyen/api-library";
 import { Client } from "@adyen/api-library";
 import HmacValidator from "@adyen/api-library/lib/src/utils/hmacValidator";
 import { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/notification/models";
@@ -69,7 +66,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   private readonly checkoutAPI_: CheckoutAPI;
 
   constructor(container, options: Options) {
-    super(container);
+    super(container, options);
 
     this.options_ = options;
 
@@ -81,7 +78,9 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
 
     this.checkoutAPI_ = new CheckoutAPI(this.client_);
 
-    this.allowedPaymentMethods = (options.allowedPaymentMethods as string).split(',').map((method) => method.trim().toLowerCase());
+    this.allowedPaymentMethods = (options.allowedPaymentMethods as string)
+      .split(",")
+      .map((method) => method.trim().toLowerCase());
   }
 
   // By default, payments are captured automatically without a delay, immediately after authorization of the payment request.
@@ -89,7 +88,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
-    
     return { status: PaymentSessionStatus.CAPTURED, data: {} };
   }
 

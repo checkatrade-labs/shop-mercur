@@ -3138,6 +3138,7 @@
   dependencies:
     "@adyen/api-library" "^30.0.0"
     stripe "^17.4.0"
+    uuid "^13.0.0"
 
 "@mercurjs/payment-stripe-connect@*", "@mercurjs/payment-stripe-connect@file:/Users/luka/projects/mercur/packages/modules/payment-stripe-connect":
   version "1.4.0"
