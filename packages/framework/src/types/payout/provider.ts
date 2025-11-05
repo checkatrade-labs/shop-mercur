@@ -8,6 +8,7 @@ export type ProcessPayoutInput = {
   account_reference_id: string
   transaction_id: string
   source_transaction: string
+  payment_session: Record<string, unknown>
 }
 
 export type ReversePayoutInput = {

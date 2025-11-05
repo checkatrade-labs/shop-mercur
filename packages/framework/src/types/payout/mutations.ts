@@ -27,6 +27,7 @@ export type CreatePayoutDTO = {
   account_id: string
   transaction_id: string
   source_transaction: string
+  payment_session: Record<string, unknown>
 }
 
 export type CreatePayoutReversalDTO = {

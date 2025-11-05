@@ -2,6 +2,7 @@ import { ConfigModule, Logger } from "@medusajs/framework/types";
 import { MedusaError, isPresent } from "@medusajs/framework/utils";
 import { LegalEntityInfoRequiredType } from "@adyen/api-library/lib/src/typings/legalEntityManagement/legalEntityInfoRequiredType";
 import { OnboardingLinkInfo } from "@adyen/api-library/lib/src/typings/legalEntityManagement/onboardingLinkInfo";
+import { AdyenDefaultPaymentMethods } from "./types";
 
 import { PAYOUT_MODULE } from "..";
 
@@ -19,15 +20,17 @@ import {
 } from "@mercurjs/framework";
 
 import {
-  BalancePlatformAPI,
-  Client,
   EnvironmentEnum,
+  Types,
+  Client,
+  BalancePlatformAPI,
   LegalEntityManagementAPI,
   ManagementAPI,
   DataProtectionAPI,
-  Types,
   TransfersAPI,
+  Config,
 } from "@adyen/api-library";
+import { PaymentMethodSetupInfo } from "@adyen/api-library/lib/src/typings/management/paymentMethodSetupInfo";
 
 type InjectedDependencies = {
   logger: Logger;
@@ -43,6 +46,8 @@ type AdyenConnectConfig = {
   adyenUrlPrefix: string;
   adyenEnvironment: EnvironmentEnum;
   adyenHmacSecret: string;
+
+  allowedPaymentMethods: string[];
 };
 
 export class AdyenPayoutProvider implements IPayoutProvider {
@@ -68,6 +73,9 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         adyenUrlPrefix: process.env.ADYEN_URL_PREFIX as string,
         adyenEnvironment: process.env.ADYEN_ENVIRONMENT as EnvironmentEnum,
         adyenHmacSecret: process.env.ADYEN_HMAC_SECRET as string,
+
+        // TODO: this should be configurable on the frontend side.
+        allowedPaymentMethods: [PaymentMethodSetupInfo.TypeEnum.Amex, PaymentMethodSetupInfo.TypeEnum.Mc, PaymentMethodSetupInfo.TypeEnum.Visa]
       };
     }
 
@@ -102,11 +110,25 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     account_reference_id,
     transaction_id,
     source_transaction,
+    payment_session,
   }: ProcessPayoutInput): Promise<ProcessPayoutResponse> {
     try {
       this.logger_.info(
         `[Adyen] Processing payout for transaction with ID ${transaction_id}`
       );
+
+      // TODO: Implement payout for Adyen
+      // Move money from main account to the seller's account (e.g. sub-merchant's balance account)
+      // console.log("--------------------------------");
+      // {
+      //   amount: '17',
+      //   currency: 'gbp',
+      //   account_reference_id: 'LE3293F22322735NDWKNL3JHD',
+      //   transaction_id: 'order_01K8QHPP3HKA97R57XVBCNDRKW',
+      //   source_transaction: 'ch_3SNUWE2U7kf7MJWk1wv5c3rj'
+      // }
+      // console.log("payment_session", payment_session);
+      // console.log("--------------------------------");
 
       // const transfer = await this.transfersApi_.TransfersApi.transferFunds(
       //   {
@@ -129,7 +151,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         MedusaError.Types.NOT_ALLOWED,
         "Adyen createPayout not yet implemented"
       );
-      
+
       return {
         data: {} as unknown as Record<string, unknown>,
         // data: transfer as unknown as Record<string, unknown>,
@@ -142,8 +164,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, message);
     }
   }
-
-
 
   async createPayoutAccount({
     payment_provider_id,
@@ -243,8 +263,33 @@ export class AdyenPayoutProvider implements IPayoutProvider {
 
       this.logger_.info(`[Adyen] Store created: ${store.id}`);
 
+      const paymentMethods: Types.management.PaymentMethod[] = [];
+
+      for (const paymentMethod of AdyenDefaultPaymentMethods) {
+        const response =
+          await this.managementApi_.PaymentMethodsMerchantLevelApi.requestPaymentMethod(
+            this.config_.adyenMerchantAccount,
+            {
+              businessLineId: businessLine.id,
+              type: paymentMethod.type,
+              storeIds: [store.id as string],
+              currencies: paymentMethod.currencies,
+              countries: paymentMethod.countries,
+            }
+          );
+
+        paymentMethods.push(response);
+      }
+
       return {
-        data: legalEntity as unknown as Record<string, unknown>,
+        data: {
+          legal_entity: legalEntity,
+          account_holder: accountHolder,
+          balance_account: balanceAccount,
+          business_line: businessLine,
+          store: store,
+          payment_methods: paymentMethods,
+        },
         id: legalEntity.id,
       };
     } catch (error) {
@@ -353,8 +398,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
 
       const legalEntity =
         await this.legalEntityApi_.LegalEntitiesApi.getLegalEntity(accountId);
-
-      this.logger_.info(`[Adyen] Legal entity retrieved: ${legalEntity.id}`);
+      this.logger_.debug(`[Adyen] Legal entity retrieved: ${legalEntity.id}`);
 
       return legalEntity as unknown as Record<string, unknown>;
     } catch (error) {

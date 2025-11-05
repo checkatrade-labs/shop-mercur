@@ -84,6 +84,7 @@
   },
   "dependencies": {
     "@adyen/api-library": "^30.0.0",
-    "stripe": "^17.4.0"
+    "stripe": "^17.4.0",
+    "uuid": "^13.0.0"
   }
 }

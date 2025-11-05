@@ -1,7 +1,10 @@
 import Stripe from "stripe";
-import { CheckoutAPI, EnvironmentEnum } from "@adyen/api-library";
+import {
+  CheckoutAPI,
+  EnvironmentEnum,
+  ManagementAPI,
+} from "@adyen/api-library";
 import { Client } from "@adyen/api-library";
-import { CreateCheckoutSessionRequest } from "@adyen/api-library/lib/src/typings/checkout/models";
 
 import {
   ProviderWebhookPayload,
@@ -17,6 +20,7 @@ import {
 import {
   AuthorizePaymentInput,
   AuthorizePaymentOutput,
+  BigNumberInput,
   CancelPaymentInput,
   CancelPaymentOutput,
   CapturePaymentInput,
@@ -27,6 +31,7 @@ import {
   GetPaymentStatusOutput,
   InitiatePaymentInput,
   InitiatePaymentOutput,
+  PaymentProviderOutput,
   RefundPaymentInput,
   RefundPaymentOutput,
   RetrievePaymentInput,
@@ -40,8 +45,9 @@ import {
   getSmallestUnit,
   ErrorCodes,
   ErrorIntentStatus,
-  PaymentIntentOptions,
 } from "@mercurjs/framework";
+import { PaymentMethodSetupInfo } from "@adyen/api-library/lib/src/typings/management/paymentMethodSetupInfo";
+import { SessionResultResponse } from "@adyen/api-library/lib/src/typings/checkout/sessionResultResponse";
 
 type Options = {
   apiKey: string;
@@ -55,12 +61,18 @@ type Options = {
   adyenUrlPrefix: string;
   adyenEnvironment: EnvironmentEnum;
   adyenHmacSecret: string;
+
+  allowedPaymentMethods: string[];
 };
+
+// TODO: Use types from "@mercurjs/framework"; as it's done for Stripe
+// e.g. import { getSmallestUnit } from "@mercurjs/framework";
 
 abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   private readonly options_: Options;
   private readonly client_: Client;
   private readonly client2_: Stripe;
+  private readonly checkoutAPI_: CheckoutAPI;
 
   constructor(container, options: Options) {
     super(container);
@@ -73,34 +85,35 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
       liveEndpointUrlPrefix: options.adyenUrlPrefix,
     });
 
+    this.checkoutAPI_ = new CheckoutAPI(this.client_);
+
     this.client2_ = new Stripe(options.apiKey);
   }
-
-  abstract get paymentIntentOptions(): PaymentIntentOptions;
 
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
-    const id = input.data?.id as string;
-    const paymentIntent = await this.client2_.paymentIntents.retrieve(id);
+
+    return { status: PaymentSessionStatus.CAPTURED, data: input.data };
+
+    const paymentIntent =
+      await this.checkoutAPI_.PaymentsApi.getResultOfPaymentSession(
+        input.data?.id as string,
+        "" // FIXME: Add sessionResult
+      );
     const dataResponse = paymentIntent as unknown as Record<string, unknown>;
 
     switch (paymentIntent.status) {
-      case "requires_payment_method":
-      case "requires_confirmation":
-      case "processing":
+      case SessionResultResponse.StatusEnum.Active:
+      case SessionResultResponse.StatusEnum.PaymentPending:
         return { status: PaymentSessionStatus.PENDING, data: dataResponse };
-      case "requires_action":
-        return {
-          status: PaymentSessionStatus.REQUIRES_MORE,
-          data: dataResponse,
-        };
-      case "canceled":
+      case SessionResultResponse.StatusEnum.Canceled:
+      case SessionResultResponse.StatusEnum.Refused:
         return { status: PaymentSessionStatus.CANCELED, data: dataResponse };
-      case "requires_capture":
-        return { status: PaymentSessionStatus.AUTHORIZED, data: dataResponse };
-      case "succeeded":
+      case SessionResultResponse.StatusEnum.Completed:
         return { status: PaymentSessionStatus.CAPTURED, data: dataResponse };
+      case SessionResultResponse.StatusEnum.Expired:
+        return { status: PaymentSessionStatus.REQUIRES_MORE, data: dataResponse };
       default:
         return { status: PaymentSessionStatus.PENDING, data: dataResponse };
     }
@@ -111,26 +124,30 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   ): Promise<InitiatePaymentOutput> {
     const { amount, currency_code } = input;
 
-    const email = input.context?.customer?.email;
-
-    const paymentIntentInput: Stripe.PaymentIntentCreateParams = {
-      ...this.paymentIntentOptions,
-      currency: currency_code,
-      amount: getSmallestUnit(amount, currency_code),
-    };
-
-    console.log("--------------------------------");
-    console.log("input", input);
-    console.log("paymentIntentInput", paymentIntentInput);
-    console.log("--------------------------------");
-
-    const checkoutAPI = new CheckoutAPI(this.client_);
-
-    
+    const session = await this.checkoutAPI_.PaymentsApi.sessions({
+      merchantAccount: this.options_.adyenMerchantAccount,
+      reference: input.context?.idempotency_key as string,
+      store: "12afad4c-12f5-4a3d-a4a6-5bb4a35e229a", // TODO: Store should be passed as a parameter dynamically
+      allowedPaymentMethods: ["visa", "mc", "amex"],
+      amount: {
+        value: getSmallestUnit(amount, currency_code),
+        currency: currency_code?.toUpperCase(),
+      },
+      returnUrl: `${process.env.STOREFRONT_URL}/user`,
+      shopperEmail: input.context?.customer?.email,
+      shopperName: {
+        firstName: input.context?.customer?.first_name as string,
+        lastName: input.context?.customer?.last_name as string,
+      },
+      // TODO: Add basic metadata about seller and order
+      metadata: {
+        session_id: input.data?.session_id as string,
+      },
+    });
 
     return {
-      id: "",
-      data: {} as unknown as Record<string, unknown>,
+      id: session.id,
+      data: session as unknown as PaymentProviderOutput,
     };
   }
 
@@ -155,28 +172,25 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
         return { data: paymentSessionData };
       }
 
-      const data = (await this.client2_.paymentIntents.cancel(id)) as any;
-      return { data };
+      const checkoutAPI = new CheckoutAPI(this.client_);
+      const session =
+        await checkoutAPI.ModificationsApi.cancelAuthorisedPayment({
+          merchantAccount: this.options_.adyenMerchantAccount,
+          paymentReference: paymentSessionData?.id as string,
+        });
+
+      return { data: session as unknown as PaymentProviderOutput };
     } catch (error) {
       throw this.buildError("An error occurred in cancelPayment", error);
     }
   }
 
+  // By default, payments are captured automatically without a delay, immediately after authorization of the payment request.
+  // ref: https://docs.adyen.com/online-payments/capture
   async capturePayment({
     data: paymentSessionData,
   }: CapturePaymentInput): Promise<CapturePaymentOutput> {
-    const id = paymentSessionData?.id as string;
-    try {
-      const data = (await this.client2_.paymentIntents.capture(id)) as any;
-      return { data };
-    } catch (error) {
-      if (error.code === ErrorCodes.PAYMENT_INTENT_UNEXPECTED_STATE) {
-        if (error.payment_intent?.status === ErrorIntentStatus.SUCCEEDED) {
-          return { data: error.payment_intent };
-        }
-      }
-      throw this.buildError("An error occurred in capturePayment", error);
-    }
+    return { data: paymentSessionData as unknown as PaymentProviderOutput };
   }
 
   deletePayment(data: DeletePaymentInput): Promise<DeletePaymentOutput> {
@@ -187,31 +201,38 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
     amount,
   }: RefundPaymentInput): Promise<RefundPaymentOutput> {
-    const id = paymentSessionData?.id as string;
-
-    try {
-      const currency = paymentSessionData?.currency as string;
-      await this.client2_.refunds.create({
-        amount: getSmallestUnit(amount, currency),
-        payment_intent: id as string,
-      });
-    } catch (e) {
-      throw this.buildError("An error occurred in refundPayment", e);
-    }
-
-    return { data: paymentSessionData };
+    // TODO: Implement refund payment
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "Refund payment not implemented"
+    );
+    // return { data: paymentSessionData };
   }
 
+  // TODO: Needs to be tested
   async retrievePayment({
     data: paymentSessionData,
   }: RetrievePaymentInput): Promise<RetrievePaymentOutput> {
     try {
-      const id = paymentSessionData?.id as string;
-      const intent = (await this.client2_.paymentIntents.retrieve(id)) as any;
 
-      intent.amount = getAmountFromSmallestUnit(intent.amount, intent.currency);
-      console.log("Stripe - retrieving", intent);
-      return { data: intent };
+      return { data: paymentSessionData as unknown as PaymentProviderOutput };
+
+      if (!paymentSessionData || !paymentSessionData?.id) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          "Payment session data is required"
+        );
+      }
+
+      const checkoutAPI = new CheckoutAPI(this.client_);
+      const response = await checkoutAPI.PaymentsApi.getResultOfPaymentSession(
+        paymentSessionData?.id as string,
+        "" // FIXME: Add sessionResult
+      );
+
+      const result = response as unknown as PaymentProviderOutput;
+
+      return { data: result };
     } catch (e) {
       throw this.buildError("An error occurred in retrievePayment", e);
     }

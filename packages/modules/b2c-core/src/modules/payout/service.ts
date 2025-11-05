@@ -154,14 +154,36 @@ class PayoutModuleService extends MedusaService({
         : PayoutAccountStatus.PENDING;
     }
 
-    await this.updatePayoutAccounts(
-      {
-        id: account_id,
-        data: account_data,
-        status,
-      },
-      sharedContext
-    );
+    if (payout_account.payment_provider_id === PaymentProvider.ADYEN_CONNECT) {
+      // NOTE:
+      // In case of Adyen, we also store other information in the payout_account.data,
+      // such as the balance account, account holder, business line, store, and so on.
+      // We MUST NOT overwrite the whole data,
+      // but only the legal_entity with the account_data (which is the newly retrieved legal entity from Adyen).
+      const new_account_data = {
+        ...payout_account.data,
+        legal_entity: account_data,
+      };
+
+      await this.updatePayoutAccounts(
+        {
+          id: account_id,
+          data: new_account_data,
+          status,
+        },
+        sharedContext
+      );
+    } else {
+      // Normally overwrite the whole data.
+      await this.updatePayoutAccounts(
+        {
+          id: account_id,
+          data: account_data,
+          status,
+        },
+        sharedContext
+      );
+    }
 
     const updated = await this.retrievePayoutAccount(
       account_id,
@@ -231,6 +253,7 @@ class PayoutModuleService extends MedusaService({
       account_id,
       transaction_id,
       source_transaction,
+      payment_session,
     } = input;
 
     const payoutAccount = await this.retrievePayoutAccount(account_id);
@@ -249,6 +272,7 @@ class PayoutModuleService extends MedusaService({
       currency: currency_code,
       transaction_id,
       source_transaction,
+      payment_session,
     });
 
     // @ts-expect-error BigNumber incompatible interface
