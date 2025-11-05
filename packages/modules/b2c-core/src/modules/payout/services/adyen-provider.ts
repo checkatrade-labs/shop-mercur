@@ -419,6 +419,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     );
   }
 
+  // Onboarding webhook handling
   async getWebhookActionAndData(
     payload: PayoutWebhookActionPayload
   ): Promise<PayoutWebhookActionAndDataResponse> {

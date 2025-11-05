@@ -5,6 +5,8 @@ import {
   ManagementAPI,
 } from "@adyen/api-library";
 import { Client } from "@adyen/api-library";
+import HmacValidator from "@adyen/api-library/lib/src/utils/hmacValidator";
+import { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/notification/models";
 
 import {
   ProviderWebhookPayload,
@@ -16,11 +18,11 @@ import {
   PaymentActions,
   PaymentSessionStatus,
   isPresent,
+  toUnixSlash,
 } from "@medusajs/framework/utils";
 import {
   AuthorizePaymentInput,
   AuthorizePaymentOutput,
-  BigNumberInput,
   CancelPaymentInput,
   CancelPaymentOutput,
   CapturePaymentInput,
@@ -93,7 +95,6 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
-
     return { status: PaymentSessionStatus.CAPTURED, data: input.data };
 
     const paymentIntent =
@@ -113,7 +114,10 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
       case SessionResultResponse.StatusEnum.Completed:
         return { status: PaymentSessionStatus.CAPTURED, data: dataResponse };
       case SessionResultResponse.StatusEnum.Expired:
-        return { status: PaymentSessionStatus.REQUIRES_MORE, data: dataResponse };
+        return {
+          status: PaymentSessionStatus.REQUIRES_MORE,
+          data: dataResponse,
+        };
       default:
         return { status: PaymentSessionStatus.PENDING, data: dataResponse };
     }
@@ -166,9 +170,8 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
   }: CancelPaymentInput): Promise<CancelPaymentOutput> {
     try {
-      const id = paymentSessionData?.id as string;
-
-      if (!id) {
+      const reference = paymentSessionData?.reference as string;
+      if (!reference) {
         return { data: paymentSessionData };
       }
 
@@ -176,7 +179,7 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
       const session =
         await checkoutAPI.ModificationsApi.cancelAuthorisedPayment({
           merchantAccount: this.options_.adyenMerchantAccount,
-          paymentReference: paymentSessionData?.id as string,
+          paymentReference: reference,
         });
 
       return { data: session as unknown as PaymentProviderOutput };
@@ -201,12 +204,32 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
     amount,
   }: RefundPaymentInput): Promise<RefundPaymentOutput> {
-    // TODO: Implement refund payment
-    throw new MedusaError(
-      MedusaError.Types.NOT_ALLOWED,
-      "Refund payment not implemented"
-    );
-    // return { data: paymentSessionData };
+    try {
+
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "Refund payment not implemented"
+      );
+
+      const response =
+        await this.checkoutAPI_.ModificationsApi.refundCapturedPayment(
+          "", // FIXME: Get payment PSP reference after we will receive the webhook
+          {
+            merchantAccount: this.options_.adyenMerchantAccount,
+            amount: {
+              value: getSmallestUnit(
+                amount,
+                paymentSessionData?.currency as string
+              ),
+              currency: paymentSessionData?.currency as string,
+            },
+          }
+        );
+
+      return { data: response as unknown as PaymentProviderOutput };
+    } catch (e) {
+      throw this.buildError("An error occurred in refundPayment", e);
+    }
   }
 
   // TODO: Needs to be tested
@@ -214,7 +237,6 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
   }: RetrievePaymentInput): Promise<RetrievePaymentOutput> {
     try {
-
       return { data: paymentSessionData as unknown as PaymentProviderOutput };
 
       if (!paymentSessionData || !paymentSessionData?.id) {
@@ -239,6 +261,12 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   }
 
   async updatePayment(input: UpdatePaymentInput): Promise<UpdatePaymentOutput> {
+
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "Update payment not implemented"
+    );
+
     const { data, amount, currency_code } = input;
 
     const amountNumeric = getSmallestUnit(amount, currency_code);
@@ -248,19 +276,31 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
     }
 
     try {
-      const id = data?.id as string;
-      const sessionData = (await this.client2_.paymentIntents.update(id, {
-        amount: amountNumeric,
-      })) as any;
+      const response = await this.checkoutAPI_.ModificationsApi.updateAuthorisedAmount(
+        "", // FIXME: Get payment PSP reference after we will receive the webhook
+        {
+          merchantAccount: this.options_.adyenMerchantAccount,
+          amount: {
+            value: amountNumeric,
+            currency: currency_code as string,
+          },
+        }
+      );
 
-      return { data: sessionData };
+      return { data: response as unknown as PaymentProviderOutput };
     } catch (e) {
       throw this.buildError("An error occurred in updatePayment", e);
     }
   }
 
+  // TODO: Implement if it's needed
   async updatePaymentData(sessionId: string, data: Record<string, unknown>) {
     try {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "Update payment data not implemented"
+      );
+
       // Prevent from updating the amount from here as it should go through
       // the updatePayment method to perform the correct logic
       if (isPresent(data.amount)) {
@@ -270,9 +310,6 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
         );
       }
 
-      return (await this.client2_.paymentIntents.update(sessionId, {
-        ...data,
-      })) as any;
     } catch (e) {
       throw this.buildError("An error occurred in updatePaymentData", e);
     }
@@ -281,44 +318,112 @@ abstract class StripeConnectProvider extends AbstractPaymentProvider<Options> {
   async getWebhookActionAndData(
     webhookData: ProviderWebhookPayload["payload"]
   ): Promise<WebhookActionResult> {
-    const event = this.constructWebhookEvent(webhookData);
-    const intent = event.data.object as Stripe.PaymentIntent;
+    
+    console.log("--------------------------------");
+    console.log("webhookData", JSON.stringify(webhookData, null, 2));
+    console.log("--------------------------------");
 
-    const { currency } = intent;
-    switch (event.type) {
-      case "payment_intent.amount_capturable_updated":
+    const rawBody =
+      typeof webhookData.rawData === "string"
+        ? webhookData.rawData
+        : webhookData.rawData.toString("utf8");
+
+    const body = JSON.parse(rawBody);
+
+    const notificationItems = body.notificationItems as Array<{
+      NotificationRequestItem: NotificationRequestItem;
+    }>;
+
+    if (!notificationItems || !Array.isArray(notificationItems)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Invalid webhook notification format"
+      );
+    }
+
+    // Process the first notification item (Adyen typically sends one per webhook)
+    const firstItem = notificationItems[0];
+    if (!firstItem?.NotificationRequestItem) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Invalid notification item structure"
+      );
+    }
+
+    const notification = firstItem.NotificationRequestItem;
+
+    // Validate HMAC signature
+    if (!notification.additionalData?.hmacSignature) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Missing hmacSignature for notification"
+      );
+    }
+
+    const hmacValidator = new HmacValidator();
+    if (!hmacValidator.validateHMAC(notification, this.options_.adyenHmacSecret)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Invalid HMAC signature for notification"
+      );
+    }
+
+    // Extract amount and currency
+    const amount = notification.amount?.value && notification.amount?.currency
+      ? getAmountFromSmallestUnit(
+          notification.amount.value,
+          notification.amount.currency
+        )
+      : 0;
+
+    const isSuccess =
+      notification.success ===
+      NotificationRequestItem.SuccessEnum.True;
+
+    // Map Adyen event codes to Medusa PaymentActions
+    const baseData = {
+      session_id: notification.merchantReference,
+      amount: amount,
+      pspReference: notification.pspReference,
+    };
+
+    switch (notification.eventCode) {
+      case NotificationRequestItem.EventCodeEnum.Authorisation:
         return {
-          action: PaymentActions.AUTHORIZED,
-          data: {
-            session_id: intent.metadata.session_id,
-            amount: getAmountFromSmallestUnit(
-              intent.amount_capturable,
-              currency
-            ),
-          },
+          action: isSuccess
+            ? PaymentActions.AUTHORIZED
+            : PaymentActions.FAILED,
+          data: baseData,
         };
-      case "payment_intent.succeeded":
+
+      case NotificationRequestItem.EventCodeEnum.Capture:
         return {
-          action: PaymentActions.SUCCESSFUL,
-          data: {
-            session_id: intent.metadata.session_id,
-            amount: getAmountFromSmallestUnit(intent.amount_received, currency),
-          },
+          action: isSuccess
+            ? PaymentActions.SUCCESSFUL
+            : PaymentActions.FAILED,
+          data: baseData,
         };
-      case "payment_intent.payment_failed":
+
+      case NotificationRequestItem.EventCodeEnum.Cancellation:
+      case NotificationRequestItem.EventCodeEnum.CancelOrRefund:
         return {
           action: PaymentActions.FAILED,
-          data: {
-            session_id: intent.metadata.session_id,
-            amount: getAmountFromSmallestUnit(intent.amount, currency),
-          },
+          data: baseData,
         };
+
+      case NotificationRequestItem.EventCodeEnum.Refund:
+      case NotificationRequestItem.EventCodeEnum.RefundFailed:
+        // Refunds are handled separately, not as payment actions
+        return { action: PaymentActions.NOT_SUPPORTED };
+
       default:
         return { action: PaymentActions.NOT_SUPPORTED };
     }
   }
 
   constructWebhookEvent(data: ProviderWebhookPayload["payload"]): Stripe.Event {
+    // This method is kept for backward compatibility but not used for Adyen webhooks
+    // Adyen webhooks are validated in getWebhookActionAndData using HMAC
     const signature = data.headers["stripe-signature"] as string;
 
     return this.client2_.webhooks.constructEvent(
