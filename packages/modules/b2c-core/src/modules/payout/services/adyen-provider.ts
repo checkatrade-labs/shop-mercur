@@ -73,9 +73,11 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         adyenUrlPrefix: process.env.ADYEN_URL_PREFIX as string,
         adyenEnvironment: process.env.ADYEN_ENVIRONMENT as EnvironmentEnum,
         adyenHmacSecret: process.env.ADYEN_HMAC_SECRET as string,
-
-        // TODO: this should be configurable on the frontend side.
-        allowedPaymentMethods: [PaymentMethodSetupInfo.TypeEnum.Amex, PaymentMethodSetupInfo.TypeEnum.Mc, PaymentMethodSetupInfo.TypeEnum.Visa]
+        allowedPaymentMethods: (
+          process.env.ADYEN_ALLOWED_PAYMENT_METHODS as string
+        )
+          .split(",")
+          .map((method) => method.trim().toLowerCase()),
       };
     }
 

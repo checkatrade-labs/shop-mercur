@@ -63,13 +63,14 @@ type Options = {
   adyenEnvironment: EnvironmentEnum;
   adyenHmacSecret: string;
 
-  allowedPaymentMethods: string[];
+  allowedPaymentMethods: string;
 };
 
 // TODO: Use types from "@mercurjs/framework"; as it's done for Stripe
 // e.g. import { getSmallestUnit } from "@mercurjs/framework";
 abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   private readonly options_: Options;
+  private readonly allowedPaymentMethods: string[];
   private readonly client_: Client;
   private readonly checkoutAPI_: CheckoutAPI;
 
@@ -85,6 +86,8 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     });
 
     this.checkoutAPI_ = new CheckoutAPI(this.client_);
+
+    this.allowedPaymentMethods = (options.allowedPaymentMethods as string).split(',').map((method) => method.trim().toLowerCase());
   }
 
   // By default, payments are captured automatically without a delay, immediately after authorization of the payment request.
@@ -105,7 +108,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
       merchantAccount: this.options_.adyenMerchantAccount,
       reference: input.context?.idempotency_key as string,
       store: "12afad4c-12f5-4a3d-a4a6-5bb4a35e229a", // TODO: Store should be passed as a parameter dynamically
-      allowedPaymentMethods: ["visa", "mc", "amex"],
+      allowedPaymentMethods: this.allowedPaymentMethods,
       amount: {
         value: getSmallestUnit(amount, currency_code),
         currency: currency_code?.toUpperCase(),
