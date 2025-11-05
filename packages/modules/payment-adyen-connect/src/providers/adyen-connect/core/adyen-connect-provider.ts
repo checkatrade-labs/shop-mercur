@@ -96,7 +96,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async initiatePayment(
     input: InitiatePaymentInput
   ): Promise<InitiatePaymentOutput> {
-    const { amount, currency_code } = input;
+    const { amount, currency_code, data } = input;
 
     const session = await this.checkoutAPI_.PaymentsApi.sessions({
       merchantAccount: this.options_.adyenMerchantAccount,
@@ -113,9 +113,9 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
         firstName: input.context?.customer?.first_name as string,
         lastName: input.context?.customer?.last_name as string,
       },
-      // TODO: Add basic metadata about seller and order
       metadata: {
-        session_id: input.data?.session_id as string,
+        cart_id: data?.cart_id as string,
+        session_id: data?.session_id as string,
       },
     });
 
