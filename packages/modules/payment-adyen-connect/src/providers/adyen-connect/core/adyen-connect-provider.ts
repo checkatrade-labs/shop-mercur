@@ -1,4 +1,3 @@
-import Stripe from "stripe";
 import {
   CheckoutAPI,
   EnvironmentEnum,
@@ -73,7 +72,6 @@ type Options = {
 abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   private readonly options_: Options;
   private readonly client_: Client;
-  private readonly client2_: Stripe;
   private readonly checkoutAPI_: CheckoutAPI;
 
   constructor(container, options: Options) {
@@ -88,8 +86,15 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     });
 
     this.checkoutAPI_ = new CheckoutAPI(this.client_);
+  }
 
-    this.client2_ = new Stripe(options.apiKey);
+  // By default, payments are captured automatically without a delay, immediately after authorization of the payment request.
+  // https://docs.adyen.com/online-payments/capture
+  async getPaymentStatus(
+    input: GetPaymentStatusInput
+  ): Promise<GetPaymentStatusOutput> {
+    
+    return { status: PaymentSessionStatus.CAPTURED, data: {} };
   }
 
   async initiatePayment(
