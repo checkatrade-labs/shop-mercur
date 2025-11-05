@@ -68,7 +68,6 @@ type Options = {
 
 // TODO: Use types from "@mercurjs/framework"; as it's done for Stripe
 // e.g. import { getSmallestUnit } from "@mercurjs/framework";
-
 abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   private readonly options_: Options;
   private readonly client_: Client;
