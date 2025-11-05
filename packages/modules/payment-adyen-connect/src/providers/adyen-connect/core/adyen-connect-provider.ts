@@ -1,7 +1,6 @@
 import {
   CheckoutAPI,
   EnvironmentEnum,
-  ManagementAPI,
 } from "@adyen/api-library";
 import { Client } from "@adyen/api-library";
 import HmacValidator from "@adyen/api-library/lib/src/utils/hmacValidator";
@@ -17,7 +16,6 @@ import {
   PaymentActions,
   PaymentSessionStatus,
   isPresent,
-  toUnixSlash,
 } from "@medusajs/framework/utils";
 import {
   AuthorizePaymentInput,
@@ -44,11 +42,7 @@ import {
 import {
   getAmountFromSmallestUnit,
   getSmallestUnit,
-  ErrorCodes,
-  ErrorIntentStatus,
 } from "@mercurjs/framework";
-import { PaymentMethodSetupInfo } from "@adyen/api-library/lib/src/typings/management/paymentMethodSetupInfo";
-import { SessionResultResponse } from "@adyen/api-library/lib/src/typings/checkout/sessionResultResponse";
 
 type Options = {
   apiKey: string;
