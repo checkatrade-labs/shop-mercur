@@ -3,6 +3,7 @@ import { MedusaError, isPresent } from "@medusajs/framework/utils";
 import { LegalEntityInfoRequiredType } from "@adyen/api-library/lib/src/typings/legalEntityManagement/legalEntityInfoRequiredType";
 import { OnboardingLinkInfo } from "@adyen/api-library/lib/src/typings/legalEntityManagement/onboardingLinkInfo";
 import { AdyenDefaultPaymentMethods } from "./types";
+import { v4 as uuidv4 } from "uuid";
 
 import { PAYOUT_MODULE } from "..";
 
@@ -28,9 +29,8 @@ import {
   ManagementAPI,
   DataProtectionAPI,
   TransfersAPI,
-  Config,
+  CheckoutAPI,
 } from "@adyen/api-library";
-import { PaymentMethodSetupInfo } from "@adyen/api-library/lib/src/typings/management/paymentMethodSetupInfo";
 
 type InjectedDependencies = {
   logger: Logger;
@@ -58,6 +58,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
   protected readonly managementApi_: ManagementAPI;
   protected readonly dataProtectionApi_: DataProtectionAPI;
   protected readonly transfersApi_: TransfersAPI;
+  protected readonly checkoutApi_: CheckoutAPI;
 
   constructor({ logger, configModule }: InjectedDependencies) {
     this.logger_ = logger;
@@ -104,6 +105,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     this.balancePlatformApi_ = new BalancePlatformAPI(platformClient);
     this.managementApi_ = new ManagementAPI(paymentClient);
     this.dataProtectionApi_ = new DataProtectionAPI(paymentClient);
+    this.checkoutApi_ = new CheckoutAPI(paymentClient);
   }
 
   async createPayout({
@@ -119,35 +121,48 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         `[Adyen] Processing payout for transaction with ID ${transaction_id}`
       );
 
-      // TODO: Implement payout for Adyen
-      // Move money from main account to the seller's account (e.g. sub-merchant's balance account)
-      // console.log("--------------------------------");
-      // {
-      //   amount: '17',
-      //   currency: 'gbp',
-      //   account_reference_id: 'LE3293F22322735NDWKNL3JHD',
-      //   transaction_id: 'order_01K8QHPP3HKA97R57XVBCNDRKW',
-      //   source_transaction: 'ch_3SNUWE2U7kf7MJWk1wv5c3rj'
-      // }
-      // console.log("payment_session", payment_session);
-      // console.log("--------------------------------");
+      console.log("--------------------------------");
+      console.log("payment_session", payment_session);
+      console.log("--------------------------------");
+      console.log("this.config_", this.config_);
+      console.log("amount", amount);
+      console.log("amount smallest unit", getSmallestUnit(amount, currency));
+      console.log("currency", currency);
+      console.log("account_reference_id", account_reference_id);
+      console.log("transaction_id", transaction_id);
+      console.log("source_transaction", source_transaction);
+      console.log("--------------------------------");
 
-      // const transfer = await this.transfersApi_.TransfersApi.transferFunds(
+      // this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
+      //   "_psp_reference",
       //   {
+      //     merchantAccount: this.config_.adyenMerchantAccount,
       //     amount: {
       //       currency: currency,
       //       value: getSmallestUnit(amount, currency),
       //     },
-      //     // category: Types.balancePlatform.Transfer.CategoryEnum.Bank,
-      //     counterparty: {
-      //       balanceAccountId: account_reference_id,
-      //     },
-      //     description: `Payout for transaction ${transaction_id}`,
-      //   },
-      //   { idempotencyKey: transaction_id }
+      //     reference: transaction_id,
+      //     splits: [
+      //       {
+      //         type: Types.checkout.Split.TypeEnum.BalanceAccount,
+      //         reference: uuidv4(),
+      //         account: sellerAdyenBalance,
+      //         amount: {
+      //           currency: currency,
+      //           value: sellerAmount,
+      //         },
+      //       },
+      //       {
+      //         type: Types.checkout.Split.TypeEnum.Commission,
+      //         reference: uuidv4(),
+      //         amount: {
+      //           currency: currency,
+      //           value: checkatradeAmount,
+      //         },
+      //       },
+      //     ],
+      //   }
       // );
-
-      // this.logger_.info(`[Adyen] Transfer created: ${transfer.id}`);
 
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
@@ -170,8 +185,16 @@ export class AdyenPayoutProvider implements IPayoutProvider {
   async createPayoutAccount({
     payment_provider_id,
     context,
-    account_id: legal_entity_id,
+    account_id,
   }: CreatePayoutAccountInput): Promise<CreatePayoutAccountResponse> {
+    console.log("--------------------------------");
+    console.log("context", context);
+    console.log("--------------------------------");
+    console.log("payment_provider_id", payment_provider_id);
+    console.log("account_id", account_id);
+    console.log("process.env.STOREFRONT_URL", process.env.STOREFRONT_URL);
+    console.log("--------------------------------");
+
     let legalEntity: Types.legalEntityManagement.LegalEntity | undefined;
     let accountHolder: Types.balancePlatform.AccountHolder | undefined;
     let balanceAccount: Types.balancePlatform.BalanceAccount | undefined;
@@ -181,55 +204,60 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     try {
       this.logger_.info("[Adyen] Creating payout account (legal entity)");
 
-      if (!isPresent(context.country)) {
+      if (
+        !isPresent(context.legal_name) ||
+        !isPresent(context.phone_number) ||
+        !isPresent(context.city) ||
+        !isPresent(context.postal_code) ||
+        !isPresent(context.street) ||
+        !isPresent(context.country) ||
+        !isPresent(context.country_code)
+      ) {
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          `"country" is required`
+          `"country", "legal_name", "phone_number", "city", "postal_code", "street", "country_code" are required`
         );
       }
 
       legalEntity =
         await this.legalEntityApi_.LegalEntitiesApi.createLegalEntity({
           type: LegalEntityInfoRequiredType.TypeEnum.Organization,
-          reference: legal_entity_id,
+          reference: account_id,
           organization: {
             legalName: context.legal_name as string,
-            description: `Legal entity for ${context.legal_name as string} on account ${legal_entity_id}`,
+            description: `Legal entity for ${context.legal_name as string} on account ${account_id}`,
             phone: {
               phoneCountryCode: context.country_code as string,
               number: context.phone_number as string,
               type: "mobile",
             },
             registeredAddress: {
+              country: context.country as string,
               city: context.city as string,
               postalCode: context.postal_code as string,
               street: context.street as string,
               street2: context.street2 as string,
-              country: context.country as string,
             },
           },
         });
-
       this.logger_.info(`[Adyen] Legal entity created: ${legalEntity.id}`);
 
       accountHolder =
         await this.balancePlatformApi_.AccountHoldersApi.createAccountHolder({
           legalEntityId: legalEntity.id,
           description: `Account holder for ${context.legal_name as string}`,
-          reference: legal_entity_id,
-          // TODO: request capabilities if needed
+          reference: account_id,
+          // NOTE: We can request capabilities if needed, but it's not required for now.
           // capabilities: {},
         });
-
       this.logger_.info(`[Adyen] Account holder created: ${accountHolder.id}`);
 
       balanceAccount =
         await this.balancePlatformApi_.BalanceAccountsApi.createBalanceAccount({
           accountHolderId: accountHolder.id!,
           description: `Balance account for ${context.legal_name as string}`,
-          reference: legal_entity_id,
+          reference: account_id,
         });
-
       this.logger_.info(
         `[Adyen] Balance account created: ${balanceAccount.id}`
       );
@@ -244,7 +272,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
           salesChannels: ["eCommerce"],
           webData: [{ webAddress: process.env.STOREFRONT_URL as string }],
         });
-
       this.logger_.info(`[Adyen] Business line created: ${businessLine.id}`);
 
       store = await this.managementApi_.AccountStoreLevelApi.createStore({
@@ -252,7 +279,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         businessLineIds: [businessLine.id],
         description: `Store for ${context.legal_name as string}`,
         address: {
-          country: "GB",
+          country: context.country as string,
           city: context.city as string,
           postalCode: context.postal_code as string,
           line1: context.street as string,
@@ -260,9 +287,8 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         },
         phoneNumber: context.phone_number as string,
         shopperStatement: (context.legal_name as string).slice(0, 22),
-        reference: legal_entity_id,
+        reference: account_id,
       });
-
       this.logger_.info(`[Adyen] Store created: ${store.id}`);
 
       const paymentMethods: Types.management.PaymentMethod[] = [];
@@ -272,11 +298,11 @@ export class AdyenPayoutProvider implements IPayoutProvider {
           await this.managementApi_.PaymentMethodsMerchantLevelApi.requestPaymentMethod(
             this.config_.adyenMerchantAccount,
             {
-              businessLineId: businessLine.id,
               type: paymentMethod.type,
-              storeIds: [store.id as string],
               currencies: paymentMethod.currencies,
               countries: paymentMethod.countries,
+              storeIds: [store.id as string],
+              businessLineId: businessLine.id,
             }
           );
 

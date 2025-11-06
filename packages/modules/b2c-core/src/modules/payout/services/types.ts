@@ -29,6 +29,7 @@ export const AdyenCountries = [
     'SI',
     'ES',
     'SE',
+    'GB'
   ];
 
   export const AdyenDefaultPaymentMethods = [

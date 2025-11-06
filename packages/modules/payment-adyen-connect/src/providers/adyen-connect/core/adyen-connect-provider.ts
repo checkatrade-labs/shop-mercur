@@ -108,7 +108,9 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     const session = await this.checkoutAPI_.PaymentsApi.sessions({
       merchantAccount: this.options_.adyenMerchantAccount,
       reference: input.context?.idempotency_key as string,
-      store: data?.seller_payout_account_id as string,
+      // The store reference below should correspond to the store created during merchant onboarding (via the createStore method).
+      // store: data?.seller_payout_account_id as string,
+      store: "12afad4c-12f5-4a3d-a4a6-5bb4a35e229a",
       allowedPaymentMethods: this.allowedPaymentMethods,
       amount: {
         value: getSmallestUnit(amount, currency_code),
