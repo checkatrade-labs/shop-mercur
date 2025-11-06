@@ -109,8 +109,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
       merchantAccount: this.options_.adyenMerchantAccount,
       reference: input.context?.idempotency_key as string,
       // The store reference below should correspond to the store created during merchant onboarding (via the createStore method).
-      // store: data?.seller_payout_account_id as string,
-      store: "12afad4c-12f5-4a3d-a4a6-5bb4a35e229a",
+      store: data?.seller_payout_account_id as string,
       allowedPaymentMethods: this.allowedPaymentMethods,
       amount: {
         value: getSmallestUnit(amount, currency_code),
