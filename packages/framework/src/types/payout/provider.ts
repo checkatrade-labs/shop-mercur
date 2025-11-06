@@ -4,6 +4,7 @@ import { PayoutWebhookAction } from './events'
 
 export type ProcessPayoutInput = {
   amount: BigNumberInput
+  commission_amount: BigNumberInput
   currency: string
   account_reference_id: string
   transaction_id: string

@@ -110,6 +110,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
 
   async createPayout({
     amount,
+    commission_amount,
     currency,
     account_reference_id,
     transaction_id,
@@ -125,8 +126,12 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       console.log("payment_session", payment_session);
       console.log("--------------------------------");
       console.log("this.config_", this.config_);
+      console.log("--------------------------------");
       console.log("amount", amount);
       console.log("amount smallest unit", getSmallestUnit(amount, currency));
+      console.log("commission_amount", commission_amount);
+      console.log("commission_amount smallest unit", getSmallestUnit(commission_amount, currency));
+      console.log("--------------------------------");
       console.log("currency", currency);
       console.log("account_reference_id", account_reference_id);
       console.log("transaction_id", transaction_id);
@@ -134,7 +139,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       console.log("--------------------------------");
 
       // this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
-      //   "_psp_reference",
+      //   pspReference,
       //   {
       //     merchantAccount: this.config_.adyenMerchantAccount,
       //     amount: {
@@ -149,7 +154,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       //         account: sellerAdyenBalance,
       //         amount: {
       //           currency: currency,
-      //           value: sellerAmount,
+      //           value: getSmallestUnit(amount, currency),
       //         },
       //       },
       //       {
@@ -157,7 +162,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       //         reference: uuidv4(),
       //         amount: {
       //           currency: currency,
-      //           value: checkatradeAmount,
+      //           value: getSmallestUnit(commission_amount, currency),
       //         },
       //       },
       //     ],

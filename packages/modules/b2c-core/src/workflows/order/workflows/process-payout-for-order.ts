@@ -1,4 +1,4 @@
-import { Modules } from "@medusajs/framework/utils";
+import { MathBN, Modules } from "@medusajs/framework/utils";
 import { transform, when } from "@medusajs/framework/workflows-sdk";
 import {
   createRemoteLinkStep,
@@ -68,11 +68,12 @@ export const processPayoutForOrderWorkflow = createWorkflow(
 
     validateSellerPayoutAccountStep(seller);
 
-    const payout_total = calculatePayoutForOrderStep(input);
+    const { payout_total, total_commission } = calculatePayoutForOrderStep(input);   
 
     const { payout, err: createPayoutErr } = createPayoutStep({
       transaction_id: order.id,
       amount: payout_total,
+      commission_amount: total_commission,
       currency_code: order.currency_code,
       account_id: seller.payout_account.id,
       payment_session: order.payment_session,

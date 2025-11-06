@@ -59,5 +59,4 @@ export default async function dailyPayoutsJob(container: MedusaContainer) {
 export const config = {
   name: 'daily-payouts',
   schedule: '0 0 * * *' // Every day at midnight
-  // schedule: '*/2 * * * *' // Every 2 minutes
 }

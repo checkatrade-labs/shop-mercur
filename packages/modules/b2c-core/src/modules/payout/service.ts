@@ -249,6 +249,7 @@ class PayoutModuleService extends MedusaService({
   ) {
     const {
       amount,
+      commission_amount,
       currency_code,
       account_id,
       transaction_id,
@@ -269,6 +270,7 @@ class PayoutModuleService extends MedusaService({
     const { data } = await provider.createPayout({
       account_reference_id: payoutAccount.reference_id,
       amount,
+      commission_amount,
       currency: currency_code,
       transaction_id,
       source_transaction,
@@ -280,6 +282,7 @@ class PayoutModuleService extends MedusaService({
       {
         data,
         amount,
+        commission_amount,
         currency_code,
         payout_account: payoutAccount.id,
       },
