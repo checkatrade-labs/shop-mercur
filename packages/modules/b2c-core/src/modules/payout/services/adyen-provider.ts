@@ -138,6 +138,10 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       console.log("source_transaction", source_transaction);
       console.log("--------------------------------");
 
+      // TODO: We miss pspReference here, we need to get it in order to update the authorised amount.
+      // and also get sellerAdyenBalance in the file `process-payout-for-order.ts`
+      // search line `transformed.payment_collections[0].payment_sessions[0].data`
+      //
       // this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
       //   pspReference,
       //   {
