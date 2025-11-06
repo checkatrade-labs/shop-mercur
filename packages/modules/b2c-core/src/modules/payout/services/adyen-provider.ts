@@ -211,7 +211,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         !isPresent(context.postal_code) ||
         !isPresent(context.street) ||
         !isPresent(context.country) ||
-        !isPresent(context.country_code)
+        !isPresent(context.country)
       ) {
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
@@ -227,7 +227,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
             legalName: context.legal_name as string,
             description: `Legal entity for ${context.legal_name as string} on account ${account_id}`,
             phone: {
-              phoneCountryCode: context.country_code as string,
+              phoneCountryCode: context.country as string,
               number: context.phone_number as string,
               type: "mobile",
             },
