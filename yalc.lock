@@ -1,9 +1,0 @@
-{
-  "version": "v1",
-  "packages": {
-    "@mercurjs/b2c-core": {
-      "signature": "a7e1e46f9c40124a4063faa6a4193aeb",
-      "pure": true
-    }
-  }
-}

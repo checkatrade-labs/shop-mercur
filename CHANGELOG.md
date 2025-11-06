@@ -5,6 +5,81 @@ All notable changes to Mercur will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2025-11-03
+
+### Release 1.4.2 - B2C Marketplace
+
+### Changed
+
+- **Improved add-to-cart load time on Storefront** (@AlanJanicki)
+
+### Fixed
+
+#### Vendor Panel
+
+- **Vendors can now see the correct list of products (Issue [#173])** (@katPanek, @AlanJanicki)
+- **Vendors can now see the current product price during price list creation** (@AlanJanicki)
+- **Vendors can now see correct order item prices on the order details page** (@AlanJanicki)
+- **Vendors can now edit shipping options without issues** (@katPanek, @AlanJanicki)
+- **Vendors can now edit product attributes without issues (Issue [#380])** (@itariv, @AlanJanicki)
+- **Vendors can now edit additional product attributes without issues** (@kilias07)
+- **Vendors can now manage inventory item locations without issues** (@AlanJanicki)
+- **Fixed UI issue with suspended account** (@AlanJanicki)
+- **Fixed price lists table item status** (@katPanek)
+- **Fixed product variant edit drawer** (@katPanek)
+
+#### Admin Panel
+
+- **Admin can now manage refund reasons without issues (Issue [#440])** (@mikolvj)
+- **Fixed UI issue in the seller edition drawer** (@sylwia-werner)
+- **Fixed sellers table pagination** (@sylwia-werner)
+- **Fixed user invitation email issues** (@jakub-borek)
+
+#### Storefront
+
+- **Storefront listings now display new products without issues** (@itariv)
+- **Fixed UI issue on the review details page** (@AlanJanicki)
+- **Fixed UI issue with the product reviews section** (@AlanJanicki)
+- **Fixed cart first step saving issues** (@AlanJanicki)
+- **Fixed product carousel on the product details page** (@AlanJanicki)
+
+#### Other
+
+- **Fixed link targets in the order confirmation email template** (@itariv, @AlanJanicki)
+
+## [1.4.1] - 2025-10-29
+
+### Fixed
+
+- **Fixed incorrect migration script (Issue [#439])**
+
+## [1.4.0] - 2025-10-27
+
+### Release 1.4.0 - B2C Marketplace
+
+### Added
+
+- **Added Stripe connection trigger** (@vholik)
+
+### Changed
+
+- **Extracted Admin Panel into a separate repository** (@mikolvj)
+
+### Fixed
+
+- **Vendors can now see correct inventory on product details pages (Issue [#175])** (@AlanJanicki)
+- **Vendors can now edit stock locations without issues** (@AlanJanicki)
+- **Storefront now displays correct delivery amount for each order** (@AlanJanicki)
+- **Storefront now displays full product names and selected variants at checkout** (@Si3r4dz)
+- **Storefront now displays promotion codes correctly in the cart** (@Si3r4dz)
+- **Storefront now validates product stock levels and prevents adding out-of-stock products to cart** (@AlanJanicki, @pfulara)
+- **Improved product quantity selection in cart** (@Si3r4dz)
+- **Improved variant selection on storefront product pages** (@AlanJanicki)
+- **Product listing price filter now works correctly on storefront** (@AlanJanicki)
+- **Fixed blinking error messages at checkout** (@AlanJanicki)
+- **Fixed errors on message page in Admin Panel** (@AlanJanicki)
+- **Fixed screen swiping issues in product detail page specific section** (@Si3r4dz)
+
 ## [1.3.0] 2025-10-15
 
 ### Release 1.3.0 - B2C Marketplace
@@ -15,8 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cleaner separation between Medusa core and Mercur extensions**
 - **Easier updates and maintenance through modular architecture**
 - **Independent versioning for different components
-Details: divide Mercur into plugins by @rigbyms in https://github.com/mercurjs/mercur/pull/410
-Read more in our [docs page](https://docs.mercurjs.com/components/backend).**
+  Details: divide Mercur into plugins by @rigbyms in https://github.com/mercurjs/mercur/pull/410
+  Read more in our [docs page](https://docs.mercurjs.com/components/backend).**
 
 ### Enhanced CLI tooling:
 
@@ -26,6 +101,7 @@ Read more in our [docs page](https://docs.mercurjs.com/components/backend).**
 - **Simplified configuration process**
 
 ### Others:
+
 - **Fix: Link tax regions to system tax provider by @NicolasGorga in https://github.com/mercurjs/mercur/pull/405**
 
 ## [1.1.0] - 2025-09-19
@@ -60,8 +136,6 @@ Read more in our [docs page](https://docs.mercurjs.com/components/backend).**
 - **Marketplace administrators can now review vendors' product updates before publishing them** ([#340](https://github.com/mercurjs/mercur/pull/340) @WojciechPlodzien)
 - **The vendor details page was fixed as it was not loading properly in rare cases** ([#359](https://github.com/mercurjs/mercur/pull/359) @slusarczykmichal)
 - **Fixed vendor reviews query to prevent query errors** ([#361](https://github.com/mercurjs/mercur/pull/361) @slusarczykmichal)
-
-
 
 ## [1.0.0] - 2025-06-23
 
