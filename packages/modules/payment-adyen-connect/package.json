@@ -1,10 +1,10 @@
 {
-  "name": "@mercurjs/payment-adyen-connect",
-  "version": "1.3.0",
-  "author": "MercurJS <hello@mercurjs.com> (https://mercurjs.com)",
+  "name": "@checkatrade/payment-adyen-connect",
+  "version": "1.0.0",
+  "author": "Checkatrade <luka.giorgadze@checkatrade.com> (https://shop.checkatrade.com)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mercurjs/mercur"
+    "url": "https://github.com/checkatrade-labs/mercur"
   },
   "license": "MIT",
   "keywords": [
@@ -84,7 +84,6 @@
   },
   "dependencies": {
     "@adyen/api-library": "^30.0.0",
-    "stripe": "^17.4.0",
-    "uuid": "^13.0.0"
+    "stripe": "^17.4.0"
   }
 }

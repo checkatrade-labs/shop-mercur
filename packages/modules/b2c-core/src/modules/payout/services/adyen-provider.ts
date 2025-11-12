@@ -3,7 +3,6 @@ import { MedusaError, isPresent } from "@medusajs/framework/utils";
 import { LegalEntityInfoRequiredType } from "@adyen/api-library/lib/src/typings/legalEntityManagement/legalEntityInfoRequiredType";
 import { OnboardingLinkInfo } from "@adyen/api-library/lib/src/typings/legalEntityManagement/onboardingLinkInfo";
 import { AdyenDefaultPaymentMethods } from "./types";
-import { v4 as uuidv4 } from "uuid";
 
 import { PAYOUT_MODULE } from "..";
 
