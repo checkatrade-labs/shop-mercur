@@ -1,7 +1,7 @@
 {
-  "name": "@checkatrade/payment-adyen-connect",
+  "name": "mercurjs-payment-adyen-connect",
   "version": "1.0.0",
-  "author": "Checkatrade <luka.giorgadze@checkatrade.com> (https://shop.checkatrade.com)",
+  "author": "Luka Giorgadze <luka.giorgadze@checkatrade.com> (https://shop.checkatrade.com)",
   "repository": {
     "type": "git",
     "url": "https://github.com/checkatrade-labs/mercur"
