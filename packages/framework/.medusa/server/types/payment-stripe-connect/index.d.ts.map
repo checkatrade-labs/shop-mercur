@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../../src/types/payment-stripe-connect/index.ts"],"names":[],"mappings":"AAAA,OAAO,MAAM,MAAM,QAAQ,CAAA;AAE3B,eAAO,MAAM,mBAAmB;;CAE/B,CAAA;AAED,MAAM,MAAM,oBAAoB,GAAG,IAAI,CACrC,MAAM,CAAC,yBAAyB,EAChC,QAAQ,GAAG,UAAU,GAAG,UAAU,GAAG,gBAAgB,CACtD,CAAA;AAED,eAAO,MAAM,UAAU;;CAEtB,CAAA;AAED,eAAO,MAAM,iBAAiB;;;CAG7B,CAAA"}

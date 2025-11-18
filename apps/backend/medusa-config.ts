@@ -53,23 +53,6 @@ module.exports = defineConfig({
       options: {
         providers: [
           {
-            resolve:
-              "@mercurjs/payment-stripe-connect/providers/stripe-connect",
-            id: "stripe-connect",
-            options: {
-              apiKey: process.env.STRIPE_SECRET_API_KEY,
-              webhookSecret:
-                process.env.STRIPE_CONNECTED_ACCOUNTS_WEBHOOK_SECRET,
-            },
-          },
-        ],
-      },
-    },
-    {
-      resolve: "@medusajs/medusa/payment",
-      options: {
-        providers: [
-          {
             resolve: "mercurjs-payment-adyen-connect/providers/adyen-connect",
             id: "adyen-connect",
             options: {

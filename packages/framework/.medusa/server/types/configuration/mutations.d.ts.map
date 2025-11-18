@@ -1,0 +1,1 @@
+{"version":3,"file":"mutations.d.ts","sourceRoot":"","sources":["../../../../src/types/configuration/mutations.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,qBAAqB,EAAE,MAAM,UAAU,CAAA;AAEhD,MAAM,WAAW,0BAA0B;IACzC,SAAS,EAAE,qBAAqB,CAAA;IAChC,UAAU,EAAE,OAAO,CAAA;CACpB;AAED,MAAM,WAAW,0BAA0B;IACzC,EAAE,EAAE,MAAM,CAAA;IACV,UAAU,EAAE,OAAO,CAAA;CACpB"}

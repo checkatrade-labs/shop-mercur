@@ -17,6 +17,6 @@
   </p> 
 </div>
 
-# @mercurjs/payment-adyen-connect
+# mercurjs-payment-adyen-connect
 
 This package is a part of MercurJS! Check our <a href="https://github.com/mercurjs/mercur">Github</a> for more information!
