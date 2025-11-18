@@ -37,7 +37,7 @@
     "@mercurjs/b2c-core": "npm:mercurjs-b2c-core@1.5.2",
     "@mercurjs/commission": "*",
     "@mercurjs/framework": "npm:mercurjs-framework@1.4.4",
-    "mercurjs-payment-adyen-connect": "*",
+    "@mercurjs/payment-adyen-connect": "*",
     "@mercurjs/payment-stripe-connect": "*",
     "@mercurjs/requests": "*",
     "@mercurjs/resend": "*",
