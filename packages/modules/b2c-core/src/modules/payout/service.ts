@@ -345,6 +345,31 @@ class PayoutModuleService extends MedusaService({
     const provider = this.getProvider(payment_provider_id);
     return await provider.getWebhookActionAndData(input);
   }
+
+  // @InjectTransactionManager()
+  // async storePaymentWebhook(
+  //   {
+  //     provider_id,
+  //     reference,
+  //     raw_payload,
+  //   }: {
+  //     provider_id: string;
+  //     reference: string;
+  //     raw_payload: Record<string, unknown>;
+  //   },
+  //   @MedusaContext() sharedContext?: Context<EntityManager>
+  // ) {
+  //   const webhook = await this.createPaymentWebhooks(
+  //     {
+  //       provider_id,
+  //       reference,
+  //       raw_payload,
+  //     },
+  //     sharedContext
+  //   );
+
+  //   return webhook;
+  // }
 }
 
 export default PayoutModuleService;

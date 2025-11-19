@@ -293,6 +293,10 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
 
     const body = JSON.parse(rawBody);
 
+    console.log("--------------------------------");
+    console.log("Webhook body input ->: ", JSON.stringify(body, null, 2));
+    console.log("--------------------------------");
+
     const notificationItems = body.notificationItems as Array<{
       NotificationRequestItem: NotificationRequestItem;
     }>;
