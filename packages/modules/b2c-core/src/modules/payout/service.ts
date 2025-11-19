@@ -9,7 +9,7 @@ import {
   MedusaService,
 } from "@medusajs/framework/utils";
 
-import { Onboarding, Payout, PayoutAccount, PayoutReversal, PaymentWebhook } from "./models";
+import { Onboarding, Payout, PayoutAccount, PayoutReversal } from "./models";
 import {
   CreateOnboardingDTO,
   CreatePayoutAccountDTO,
@@ -31,7 +31,7 @@ class PayoutModuleService extends MedusaService({
   PayoutReversal,
   PayoutAccount,
   Onboarding,
-  PaymentWebhook,
+  // PaymentWebhook,
 }) {
   protected providers_: Map<string, IPayoutProvider>;
 
@@ -346,30 +346,30 @@ class PayoutModuleService extends MedusaService({
     return await provider.getWebhookActionAndData(input);
   }
 
-  @InjectTransactionManager()
-  async storePaymentWebhook(
-    {
-      provider_id,
-      reference,
-      raw_payload,
-    }: {
-      provider_id: string;
-      reference: string;
-      raw_payload: Record<string, unknown>;
-    },
-    @MedusaContext() sharedContext?: Context<EntityManager>
-  ) {
-    const webhook = await this.createPaymentWebhooks(
-      {
-        provider_id,
-        reference,
-        raw_payload,
-      },
-      sharedContext
-    );
+  // @InjectTransactionManager()
+  // async storePaymentWebhook(
+  //   {
+  //     provider_id,
+  //     reference,
+  //     raw_payload,
+  //   }: {
+  //     provider_id: string;
+  //     reference: string;
+  //     raw_payload: Record<string, unknown>;
+  //   },
+  //   @MedusaContext() sharedContext?: Context<EntityManager>
+  // ) {
+  //   const webhook = await this.createPaymentWebhooks(
+  //     {
+  //       provider_id,
+  //       reference,
+  //       raw_payload,
+  //     },
+  //     sharedContext
+  //   );
 
-    return webhook;
-  }
+  //   return webhook;
+  // }
 }
 
 export default PayoutModuleService;
