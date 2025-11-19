@@ -9,7 +9,7 @@ import {
   MedusaService,
 } from "@medusajs/framework/utils";
 
-import { Onboarding, Payout, PayoutAccount, PayoutReversal } from "./models";
+import { Onboarding, Payout, PayoutAccount, PayoutReversal, PaymentWebhook } from "./models";
 import {
   CreateOnboardingDTO,
   CreatePayoutAccountDTO,
@@ -31,6 +31,7 @@ class PayoutModuleService extends MedusaService({
   PayoutReversal,
   PayoutAccount,
   Onboarding,
+  PaymentWebhook,
 }) {
   protected providers_: Map<string, IPayoutProvider>;
 
