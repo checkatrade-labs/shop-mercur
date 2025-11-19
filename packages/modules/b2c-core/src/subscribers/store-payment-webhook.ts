@@ -1,20 +1,23 @@
 import { ProviderWebhookPayload } from "@medusajs/framework/types";
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { PaymentWebhookEvents } from "@medusajs/framework/utils";
-import PayoutModuleService from "../modules/payout/service";
+// import { PAYOUT_MODULE } from "../modules/payout";
+// import PayoutModuleService from "../modules/payout/service";
 
 export default async function storePaymentWebhookHandler({
   event,
   container,
 }: SubscriberArgs<ProviderWebhookPayload>) {
-  const payoutService: PayoutModuleService = container.resolve(
-    "payoutModuleService"
-  );
+  //
+  // const payoutService: PayoutModuleService = container.resolve(PAYOUT_MODULE);
 
   const { provider, payload } = event.data;
 
   console.log("--------------------------------");
-  console.log("Subscirber: Webhook event data ->: ", JSON.stringify(event.data, null, 2));
+  console.log(
+    "Subscirber: Webhook event data -> ",
+    JSON.stringify(event.data, null, 2)
+  );
   console.log("--------------------------------");
 
   // Parse the raw payload
@@ -47,11 +50,11 @@ export default async function storePaymentWebhookHandler({
   }
 
   // Store the webhook
-  await payoutService.storePaymentWebhook({
-    provider_id: provider,
-    reference,
-    raw_payload: body,
-  });
+  // await payoutService.storePaymentWebhook({
+  //   provider_id: provider,
+  //   reference,
+  //   raw_payload: body,
+  // });
 }
 
 export const config: SubscriberConfig = {

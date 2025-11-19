@@ -49,7 +49,7 @@
     "algoliasearch": "^5.20.2",
     "awilix": "^8.0.1",
     "csv-parse": "^6.1.0",
-    "mercurjs-payment-adyen-connect": "*",
+    "mercurjs-payment-adyen-connect": "file:.yalc/mercurjs-payment-adyen-connect",
     "pg": "^8.13.0",
     "resend": "^4.1.2",
     "stripe": "^17.4.0",
