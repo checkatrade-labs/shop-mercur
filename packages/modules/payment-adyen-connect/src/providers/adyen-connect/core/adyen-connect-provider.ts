@@ -41,7 +41,6 @@ import {
 
 type Options = {
   apiKey: string;
-  webhookSecret: string;
 
   adyenMerchantAccount: string;
   adyenThemeId: string;
