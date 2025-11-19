@@ -1,0 +1,1 @@
+{"version":3,"file":"index.js","sourceRoot":"","sources":["../../../../src/types/payment-stripe-connect/index.ts"],"names":[],"mappings":";;;AAEa,QAAA,mBAAmB,GAAG;IACjC,IAAI,EAAE,MAAM;CACb,CAAA;AAOY,QAAA,UAAU,GAAG;IACxB,+BAA+B,EAAE,iCAAiC;CACnE,CAAA;AAEY,QAAA,iBAAiB,GAAG;IAC/B,SAAS,EAAE,WAAW;IACtB,QAAQ,EAAE,UAAU;CACrB,CAAA"}

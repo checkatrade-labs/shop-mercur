@@ -1,0 +1,1 @@
+{"version":3,"file":"mutations.d.ts","sourceRoot":"","sources":["../../../../src/types/marketplace/mutations.ts"],"names":[],"mappings":"AAAA,MAAM,MAAM,iBAAiB,GAAG;IAC9B,OAAO,EAAE,MAAM,CAAA;IACf,WAAW,EAAE,MAAM,CAAA;IACnB,qBAAqB,EAAE,MAAM,CAAA;IAC7B,gBAAgB,EAAE,MAAM,CAAA;CACzB,CAAA"}

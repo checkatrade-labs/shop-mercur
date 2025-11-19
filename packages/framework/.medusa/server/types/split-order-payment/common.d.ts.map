@@ -1,0 +1,1 @@
+{"version":3,"file":"common.d.ts","sourceRoot":"","sources":["../../../../src/types/split-order-payment/common.ts"],"names":[],"mappings":"AAAA,MAAM,MAAM,oBAAoB,GAAG;IACjC,EAAE,EAAE,MAAM,CAAA;IACV,MAAM,EAAE,MAAM,CAAA;IACd,aAAa,EAAE,MAAM,CAAA;IACrB,iBAAiB,EAAE,MAAM,CAAA;IACzB,eAAe,EAAE,MAAM,CAAA;IACvB,eAAe,EAAE,MAAM,CAAA;IACvB,qBAAqB,EAAE,MAAM,CAAA;CAC9B,CAAA"}

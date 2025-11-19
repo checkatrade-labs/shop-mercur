@@ -1,0 +1,1 @@
+{"version":3,"file":"update-product-status.d.ts","sourceRoot":"","sources":["../../../src/workflows/update-product-status.ts"],"names":[],"mappings":"AAAA,OAAO,EAAW,aAAa,EAAE,MAAM,2BAA2B,CAAC;AAQnE,eAAO,MAAM,uBAAuB;QAEd,MAAM;YAAU,aAAa;wCAYlD,CAAC;AAEF,eAAO,MAAM,2BAA2B;QAEf,MAAM;YAAU,aAAa;4CAGrD,CAAC"}

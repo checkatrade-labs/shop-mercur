@@ -2718,17 +2718,18 @@
     "@medusajs/utils" "2.10.2"
     ulid "^2.3.0"
 
-"@mercurjs/b2c-core@npm:mercurjs-b2c-core@1.5.2":
+"@mercurjs/b2c-core@file:apps/backend/.yalc/mercurjs-b2c-core":
   version "1.5.2"
-  resolved "https://registry.npmjs.org/mercurjs-b2c-core/-/mercurjs-b2c-core-1.5.2.tgz"
-  integrity sha512-pboU93qRQirYiSDEI6+RmUxNtEyi1OtJWaN8nfkp6+bM+puk4PK0tXALISSMVhiHKtmZWUFBjHhlXi4WOGMZbg==
   dependencies:
     "@adyen/api-library" "^30.0.0"
 
-"@mercurjs/framework@*", "@mercurjs/framework@npm:mercurjs-framework@1.4.4":
+"@mercurjs/framework@*":
   version "1.4.4"
   resolved "https://registry.npmjs.org/mercurjs-framework/-/mercurjs-framework-1.4.4.tgz"
   integrity sha512-wUwOc+JwBc3j6vv7QgZ0u494Xlys5IQU386TVBio+KdducoSjbh385BGAsHV9vSV8XBiDBK86fkSDX/xOwJQBg==
+
+"@mercurjs/framework@file:apps/backend/.yalc/mercurjs-framework":
+  version "1.4.4"
 
 "@mikro-orm/cli@6.4.3":
   version "6.4.3"
