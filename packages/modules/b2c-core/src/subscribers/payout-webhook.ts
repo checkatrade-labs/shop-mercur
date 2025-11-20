@@ -33,10 +33,6 @@ export default async function payoutWebhookHandler({
   // Stripe uses 'stripe-signature', Adyen uses 'hmac' or other headers
   let payment_provider_id = PaymentProvider.STRIPE_CONNECT; // Default to Stripe for backwards compatibility
 
-  console.log("--------------------------------");
-  console.log("------ input ------: ", JSON.stringify(input, null, 2));
-  console.log("--------------------------------");
-
   if (input.headers?.["stripe-signature"]) {
     payment_provider_id = PaymentProvider.STRIPE_CONNECT;
   } else if (input.headers?.["hmac"] || input.headers?.["adyen-signature"]) {

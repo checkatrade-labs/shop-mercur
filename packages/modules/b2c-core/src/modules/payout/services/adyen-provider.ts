@@ -195,14 +195,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     context,
     account_id,
   }: CreatePayoutAccountInput): Promise<CreatePayoutAccountResponse> {
-    console.log("--------------------------------");
-    console.log("context", context);
-    console.log("--------------------------------");
-    console.log("payment_provider_id", payment_provider_id);
-    console.log("account_id", account_id);
-    console.log("process.env.STOREFRONT_URL", process.env.STOREFRONT_URL);
-    console.log("--------------------------------");
-
     let legalEntity: Types.legalEntityManagement.LegalEntity | undefined;
     let accountHolder: Types.balancePlatform.AccountHolder | undefined;
     let balanceAccount: Types.balancePlatform.BalanceAccount | undefined;
