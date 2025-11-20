@@ -15,13 +15,6 @@ export default async function storePaymentWebhookHandler({
   const { provider, payload } = event.data;
   const providerId = `pp_${provider}`;
 
-  console.log("--------------------------------");
-  console.log(
-    "event.data -> ",
-    JSON.stringify(event.data, null, 2)
-  );
-  console.log("--------------------------------");
-
   // Parse the raw payload
   const rawBody =
     typeof payload.rawData === "string"
@@ -30,8 +23,6 @@ export default async function storePaymentWebhookHandler({
 
   const body = JSON.parse(rawBody);
 
-  // For Adyen, extract the merchant reference from the webhook
-  // The structure is: { notificationItems: [{ NotificationRequestItem: {...} }] }
   let reference = "";
 
   // provider includes pp_ prefix so we need to check if it contains the payment provider id, which is without the pp_ prefix
