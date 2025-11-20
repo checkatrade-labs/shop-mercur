@@ -1,21 +1,23 @@
 import { ProviderWebhookPayload } from "@medusajs/framework/types";
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { PaymentWebhookEvents } from "@medusajs/framework/utils";
-// import { PAYOUT_MODULE } from "../modules/payout";
-// import PayoutModuleService from "../modules/payout/service";
+import { PAYOUT_MODULE } from "../modules/payout";
+import PayoutModuleService from "../modules/payout/service";
+import { PaymentProvider } from "../api/vendor/payout-account/types";
 
 export default async function storePaymentWebhookHandler({
   event,
   container,
 }: SubscriberArgs<ProviderWebhookPayload>) {
   //
-  // const payoutService: PayoutModuleService = container.resolve(PAYOUT_MODULE);
+  const payoutService: PayoutModuleService = container.resolve(PAYOUT_MODULE);
 
   const { provider, payload } = event.data;
+  const providerId = `pp_${provider}`;
 
   console.log("--------------------------------");
   console.log(
-    "Subscirber: Webhook event data -> ",
+    "event.data -> ",
     JSON.stringify(event.data, null, 2)
   );
   console.log("--------------------------------");
@@ -28,15 +30,12 @@ export default async function storePaymentWebhookHandler({
 
   const body = JSON.parse(rawBody);
 
-  console.log("--------------------------------");
-  console.log("Subscirber: Webhook body ->: ", JSON.stringify(body, null, 2));
-  console.log("--------------------------------");
-
   // For Adyen, extract the merchant reference from the webhook
   // The structure is: { notificationItems: [{ NotificationRequestItem: {...} }] }
   let reference = "";
 
-  if (provider === "pp_adyen_connect_adyen") {
+  // provider includes pp_ prefix so we need to check if it contains the payment provider id, which is without the pp_ prefix
+  if (providerId === PaymentProvider.ADYEN_CONNECT) {
     const notificationItems = body.notificationItems;
     if (
       notificationItems &&
@@ -44,17 +43,18 @@ export default async function storePaymentWebhookHandler({
       notificationItems[0]
     ) {
       const notification = notificationItems[0].NotificationRequestItem;
-      reference =
-        notification?.merchantReference || notification?.pspReference || "";
+      reference = notification?.merchantReference;
     }
+  } else if (providerId === PaymentProvider.STRIPE_CONNECT) {
+    // TODO: Get the reference from the Stripe webhook body
+    reference = body.data?.object?.id;
   }
 
-  // Store the webhook
-  // await payoutService.storePaymentWebhook({
-  //   provider_id: provider,
-  //   reference,
-  //   raw_payload: body,
-  // });
+  await payoutService.storePaymentWebhook({
+    provider_id: providerId,
+    reference,
+    raw_payload: body,
+  });
 }
 
 export const config: SubscriberConfig = {

@@ -10691,6 +10691,11 @@ media-typer@0.3.0:
   resolved "https://registry.npmjs.org/media-typer/-/media-typer-0.3.0.tgz"
   integrity sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==
 
+"mercurjs-b2c-core@file:apps/backend/.yalc/mercurjs-b2c-core":
+  version "1.5.2"
+  dependencies:
+    "@adyen/api-library" "^30.0.0"
+
 "mercurjs-payment-adyen-connect@file:apps/backend/.yalc/mercurjs-payment-adyen-connect":
   version "1.0.3"
   dependencies:
