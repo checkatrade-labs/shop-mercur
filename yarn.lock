@@ -2718,17 +2718,12 @@
     "@medusajs/utils" "2.10.2"
     ulid "^2.3.0"
 
-"@mercurjs/b2c-core@file:apps/backend/.yalc/mercurjs-b2c-core":
+"@mercurjs/b2c-core@file:apps/backend/.yalc/@mercurjs/b2c-core":
   version "1.5.2"
   dependencies:
     "@adyen/api-library" "^30.0.0"
 
-"@mercurjs/framework@*":
-  version "1.4.4"
-  resolved "https://registry.npmjs.org/mercurjs-framework/-/mercurjs-framework-1.4.4.tgz"
-  integrity sha512-wUwOc+JwBc3j6vv7QgZ0u494Xlys5IQU386TVBio+KdducoSjbh385BGAsHV9vSV8XBiDBK86fkSDX/xOwJQBg==
-
-"@mercurjs/framework@file:apps/backend/.yalc/mercurjs-framework":
+"@mercurjs/framework@file:apps/backend/.yalc/@mercurjs/framework":
   version "1.4.4"
 
 "@mikro-orm/cli@6.4.3":
@@ -10695,6 +10690,9 @@ media-typer@0.3.0:
   version "1.5.2"
   dependencies:
     "@adyen/api-library" "^30.0.0"
+
+"mercurjs-framework@file:apps/backend/.yalc/mercurjs-framework":
+  version "1.4.4"
 
 "mercurjs-payment-adyen-connect@file:apps/backend/.yalc/mercurjs-payment-adyen-connect":
   version "1.0.3"

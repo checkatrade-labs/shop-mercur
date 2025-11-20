@@ -19,6 +19,7 @@ export type CreatePayoutDTO = {
     transaction_id: string;
     source_transaction: string;
     payment_session: Record<string, unknown>;
+    webhook_data?: Record<string, unknown>;
 };
 export type CreatePayoutReversalDTO = {
     payout_id: string;

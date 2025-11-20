@@ -85,6 +85,10 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
+    console.log("--------------------------------");
+    console.log("getPaymentStatus input:", JSON.stringify(input, null, 2));
+    console.log("getPaymentStatus returning: CAPTURED");
+    console.log("--------------------------------");
     return { status: PaymentSessionStatus.CAPTURED, data: {} };
   }
 
@@ -179,6 +183,17 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     amount,
   }: RefundPaymentInput): Promise<RefundPaymentOutput> {
     try {
+      console.log("================================");
+      console.log("!!! REFUND PAYMENT CALLED !!!");
+      console.log("Stack trace to see WHO is calling this:");
+      console.trace();
+      console.log("Payment data:", JSON.stringify(paymentSessionData, null, 2));
+      console.log("Amount to refund:", amount);
+      console.log("================================");
+
+
+      return { data: paymentSessionData };
+
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
         "Refund payment not implemented"
@@ -363,11 +378,34 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
           action: isSuccess ? PaymentActions.AUTHORIZED : PaymentActions.FAILED,
           data: baseData,
         };
+
       case NotificationRequestItem.EventCodeEnum.Capture:
         return {
           action: isSuccess ? PaymentActions.SUCCESSFUL : PaymentActions.FAILED,
           data: baseData,
         };
+
+      case NotificationRequestItem.EventCodeEnum.Cancellation:
+      case NotificationRequestItem.EventCodeEnum.CancelOrRefund:
+        return {
+          action: PaymentActions.CANCELED,
+          data: baseData,
+        };
+
+      case NotificationRequestItem.EventCodeEnum.Refund:
+      case NotificationRequestItem.EventCodeEnum.RefundFailed:
+      case NotificationRequestItem.EventCodeEnum.CaptureFailed:
+        return {
+          action: PaymentActions.FAILED,
+          data: baseData,
+        };
+
+      case NotificationRequestItem.EventCodeEnum.Pending:
+        return {
+          action: PaymentActions.PENDING,
+          data: baseData,
+        };
+
       default:
         return { action: PaymentActions.NOT_SUPPORTED };
     }
