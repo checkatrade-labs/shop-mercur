@@ -50,6 +50,7 @@
     "awilix": "^8.0.1",
     "csv-parse": "^6.1.0",
     "mercurjs-b2c-core": "file:.yalc/mercurjs-b2c-core",
+    "mercurjs-framework": "file:.yalc/mercurjs-framework",
     "mercurjs-payment-adyen-connect": "file:.yalc/mercurjs-payment-adyen-connect",
     "pg": "^8.13.0",
     "resend": "^4.1.2",

@@ -256,6 +256,7 @@ class PayoutModuleService extends MedusaService({
       transaction_id,
       source_transaction,
       payment_session,
+      webhook_data,
     } = input;
 
     const payoutAccount = await this.retrievePayoutAccount(account_id);
@@ -276,6 +277,7 @@ class PayoutModuleService extends MedusaService({
       transaction_id,
       source_transaction,
       payment_session,
+      webhook_data,
     });
 
     // @ts-expect-error BigNumber incompatible interface

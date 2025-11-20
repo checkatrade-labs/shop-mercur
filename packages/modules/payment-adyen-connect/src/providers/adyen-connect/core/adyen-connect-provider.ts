@@ -102,6 +102,10 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
       );
     }
 
+    console.log("--------------------------------");
+    console.log("initiatePayment input:", JSON.stringify(input, null, 2));
+    console.log("--------------------------------");
+
     const session = await this.checkoutAPI_.PaymentsApi.sessions({
       merchantAccount: this.options_.adyenMerchantAccount,
       reference: input.context?.idempotency_key as string,
@@ -348,7 +352,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     const baseData = {
       success: isSuccess,
       reason: notification.reason,
-      session_id: notification.merchantReference,
+      session_id: notification.additionalData["metadata.session_id"] as string,
       amount: amount,
       pspReference: notification.pspReference,
     };
@@ -359,34 +363,11 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
           action: isSuccess ? PaymentActions.AUTHORIZED : PaymentActions.FAILED,
           data: baseData,
         };
-
       case NotificationRequestItem.EventCodeEnum.Capture:
         return {
           action: isSuccess ? PaymentActions.SUCCESSFUL : PaymentActions.FAILED,
           data: baseData,
         };
-
-      case NotificationRequestItem.EventCodeEnum.Cancellation:
-      case NotificationRequestItem.EventCodeEnum.CancelOrRefund:
-        return {
-          action: PaymentActions.CANCELED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Refund:
-      case NotificationRequestItem.EventCodeEnum.RefundFailed:
-      case NotificationRequestItem.EventCodeEnum.CaptureFailed:
-        return {
-          action: PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Pending:
-        return {
-          action: PaymentActions.PENDING,
-          data: baseData,
-        };
-
       default:
         return { action: PaymentActions.NOT_SUPPORTED };
     }

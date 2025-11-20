@@ -115,14 +115,20 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     transaction_id,
     source_transaction,
     payment_session,
+    webhook_data,
   }: ProcessPayoutInput): Promise<ProcessPayoutResponse> {
     try {
       this.logger_.info(
         `[Adyen] Processing payout for transaction with ID ${transaction_id}`
       );
 
+      // TODO: Reference from payment session and webhook data should be the same,
+      // currently they don't match.
+      // specifically, merchantReference from webhook and payment_session.id are different.
       console.log("--------------------------------");
       console.log("payment_session", payment_session);
+      console.log("--------------------------------");
+      console.log("webhook_data", webhook_data);
       console.log("--------------------------------");
       console.log("this.config_", this.config_);
       console.log("--------------------------------");
@@ -137,49 +143,66 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       console.log("source_transaction", source_transaction);
       console.log("--------------------------------");
 
-      // TODO: We miss pspReference here, we need to get it in order to update the authorised amount.
-      // and also get sellerAdyenBalance in the file `process-payout-for-order.ts`
-      // search line `transformed.payment_collections[0].payment_sessions[0].data`
-      //
-      // this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
-      //   pspReference,
-      //   {
-      //     merchantAccount: this.config_.adyenMerchantAccount,
-      //     amount: {
-      //       currency: currency,
-      //       value: getSmallestUnit(amount, currency),
-      //     },
-      //     reference: transaction_id,
-      //     splits: [
-      //       {
-      //         type: Types.checkout.Split.TypeEnum.BalanceAccount,
-      //         reference: uuidv4(),
-      //         account: sellerAdyenBalance,
-      //         amount: {
-      //           currency: currency,
-      //           value: getSmallestUnit(amount, currency),
-      //         },
-      //       },
-      //       {
-      //         type: Types.checkout.Split.TypeEnum.Commission,
-      //         reference: uuidv4(),
-      //         amount: {
-      //           currency: currency,
-      //           value: getSmallestUnit(commission_amount, currency),
-      //         },
-      //       },
-      //     ],
-      //   }
-      // );
+      if (!webhook_data || !webhook_data.pspReference) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `No webhook data or pspReference provided`
+        );
+      }
 
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        "Adyen createPayout not yet implemented"
+      const pspReference = webhook_data.pspReference as string;
+
+      // Get seller's Adyen balance account from payment session data
+      const sessionData = payment_session.data as Record<string, any>;
+      const sellerAdyenBalance = sessionData?.seller_payout_account_id;
+
+      if (!sellerAdyenBalance) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `No seller_payout_account_id found in payment session data`
+        );
+      }
+
+      this.logger_.info(
+        `[Adyen] Updating authorized amount with pspReference: ${pspReference}, sellerBalance: ${sellerAdyenBalance}`
+      );
+
+      // Update the authorized amount with splits
+      const updateResponse = await this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
+        pspReference,
+        {
+          merchantAccount: this.config_.adyenMerchantAccount,
+          amount: {
+            currency: currency,
+            value: getSmallestUnit(amount, currency),
+          },
+          reference: transaction_id,
+          splits: [
+            {
+              type: Types.checkout.Split.TypeEnum.BalanceAccount,
+              account: sellerAdyenBalance as string,
+              amount: {
+                currency: currency,
+                value: getSmallestUnit(amount, currency),
+              },
+            },
+            {
+              type: Types.checkout.Split.TypeEnum.Commission,
+              amount: {
+                currency: currency,
+                value: getSmallestUnit(commission_amount, currency),
+              },
+            },
+          ],
+        }
+      );
+
+      this.logger_.info(
+        `[Adyen] Successfully updated authorized amount, response: ${updateResponse.pspReference}`
       );
 
       return {
-        data: {} as unknown as Record<string, unknown>,
-        // data: transfer as unknown as Record<string, unknown>,
+        data: updateResponse as unknown as Record<string, unknown>,
       };
     } catch (error) {
       this.logger_.error("[Adyen] Error occurred while creating payout", error);
