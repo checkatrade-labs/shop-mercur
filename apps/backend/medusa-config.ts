@@ -65,28 +65,28 @@ module.exports = defineConfig({
         ],
       },
     },
-    {
-      resolve: "@medusajs/medusa/payment",
-      options: {
-        providers: [
-          {
-            resolve: "mercurjs-payment-adyen-connect/providers/adyen-connect",
-            id: "adyen-connect",
-            options: {
-              adyenMerchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT,
-              adyenThemeId: process.env.ADYEN_THEME_ID,
-              adyenPaymentApiKey: process.env.ADYEN_PAYMENT_API_KEY,
-              adyenPlatformApiKey: process.env.ADYEN_PLATFORM_API_KEY,
-              adyenLegalApiKey: process.env.ADYEN_LEGAL_API_KEY,
-              adyenUrlPrefix: process.env.ADYEN_URL_PREFIX,
-              adyenEnvironment: process.env.ADYEN_ENVIRONMENT,
-              adyenHmacSecret: process.env.ADYEN_HMAC_SECRET,
-              allowedPaymentMethods: process.env.ADYEN_ALLOWED_PAYMENT_METHODS,
-            },
-          },
-        ],
-      },
-    },
+    // {
+    //   resolve: "@medusajs/medusa/payment",
+    //   options: {
+    //     providers: [
+    //       {
+    //         resolve: "mercurjs-payment-adyen-connect/providers/adyen-connect",
+    //         id: "adyen-connect",
+    //         options: {
+    //           adyenMerchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT,
+    //           adyenThemeId: process.env.ADYEN_THEME_ID,
+    //           adyenPaymentApiKey: process.env.ADYEN_PAYMENT_API_KEY,
+    //           adyenPlatformApiKey: process.env.ADYEN_PLATFORM_API_KEY,
+    //           adyenLegalApiKey: process.env.ADYEN_LEGAL_API_KEY,
+    //           adyenUrlPrefix: process.env.ADYEN_URL_PREFIX,
+    //           adyenEnvironment: process.env.ADYEN_ENVIRONMENT,
+    //           adyenHmacSecret: process.env.ADYEN_HMAC_SECRET,
+    //           allowedPaymentMethods: process.env.ADYEN_ALLOWED_PAYMENT_METHODS,
+    //         },
+    //       },
+    //     ],
+    //   },
+    // },
     {
       resolve: "@medusajs/medusa/notification",
       options: {
