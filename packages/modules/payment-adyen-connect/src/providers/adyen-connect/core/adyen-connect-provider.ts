@@ -85,10 +85,8 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
-    console.log("--------------------------------");
-    console.log("getPaymentStatus input:", JSON.stringify(input, null, 2));
-    console.log("getPaymentStatus returning: CAPTURED");
-    console.log("--------------------------------");
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     return { status: PaymentSessionStatus.CAPTURED, data: {} };
   }
 
@@ -105,10 +103,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
         "seller_payout_account_id is required"
       );
     }
-
-    console.log("--------------------------------");
-    console.log("initiatePayment input:", JSON.stringify(input, null, 2));
-    console.log("--------------------------------");
 
     const session = await this.checkoutAPI_.PaymentsApi.sessions({
       merchantAccount: this.options_.adyenMerchantAccount,
@@ -141,6 +135,9 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async authorizePayment(
     data: AuthorizePaymentInput
   ): Promise<AuthorizePaymentOutput> {
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     return { status: PaymentSessionStatus.AUTHORIZED, data: data.data };
   }
 
@@ -148,6 +145,9 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
   }: CancelPaymentInput): Promise<CancelPaymentOutput> {
     try {
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       const reference = paymentSessionData?.reference as string;
       if (!reference) {
         return { data: paymentSessionData };
@@ -171,7 +171,9 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async capturePayment({
     data: paymentSessionData,
   }: CapturePaymentInput): Promise<CapturePaymentOutput> {
-    return { data: paymentSessionData as unknown as PaymentProviderOutput };
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    return { data: paymentSessionData };
   }
 
   deletePayment(data: DeletePaymentInput): Promise<DeletePaymentOutput> {
@@ -183,14 +185,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     amount,
   }: RefundPaymentInput): Promise<RefundPaymentOutput> {
     try {
-      console.log("================================");
-      console.log("!!! REFUND PAYMENT CALLED !!!");
-      console.log("Stack trace to see WHO is calling this:");
-      console.trace();
-      console.log("Payment data:", JSON.stringify(paymentSessionData, null, 2));
-      console.log("Amount to refund:", amount);
-      console.log("================================");
-
 
       return { data: paymentSessionData };
 
@@ -310,6 +304,8 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
         ? webhookData.rawData
         : webhookData.rawData.toString("utf8");
 
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     const body = JSON.parse(rawBody);
 
     const notificationItems = body.notificationItems as Array<{
@@ -374,40 +370,14 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
 
     switch (notification.eventCode) {
       case NotificationRequestItem.EventCodeEnum.Authorisation:
-        return {
-          action: isSuccess ? PaymentActions.AUTHORIZED : PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Capture:
-        return {
-          action: isSuccess ? PaymentActions.SUCCESSFUL : PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Cancellation:
-      case NotificationRequestItem.EventCodeEnum.CancelOrRefund:
-        return {
-          action: PaymentActions.CANCELED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Refund:
-      case NotificationRequestItem.EventCodeEnum.RefundFailed:
-      case NotificationRequestItem.EventCodeEnum.CaptureFailed:
-        return {
-          action: PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Pending:
-        return {
-          action: PaymentActions.PENDING,
-          data: baseData,
-        };
+        // Return NOT_SUPPORTED to prevent Medusa's default webhook handler
+        // from trying to complete the cart using the standard workflow.
+        // The custom order-set-placed-payment-capture subscriber handles
+        // payment capture after the split-and-complete-cart workflow completes.
+        return { action: PaymentActions.NOT_SUPPORTED, data: baseData };
 
       default:
-        return { action: PaymentActions.NOT_SUPPORTED };
+        return { action: PaymentActions.NOT_SUPPORTED, data: baseData };
     }
   }
 
