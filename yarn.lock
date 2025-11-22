@@ -2734,10 +2734,12 @@
     ulid "^2.3.0"
 
 "@mercurjs/b2c-core@file:apps/backend/.yalc/@mercurjs/b2c-core":
-  version "1.4.3"
+  version "1.5.2"
+  dependencies:
+    "@adyen/api-library" "^30.0.0"
 
 "@mercurjs/framework@file:apps/backend/.yalc/@mercurjs/framework":
-  version "1.4.3"
+  version "1.4.4"
 
 "@mikro-orm/cli@6.4.3":
   version "6.4.3"
