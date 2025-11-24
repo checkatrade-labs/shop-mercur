@@ -87,6 +87,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   ): Promise<GetPaymentStatusOutput> {
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
+
     return { status: PaymentSessionStatus.CAPTURED, data: {} };
   }
 
@@ -145,9 +146,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
   }: CancelPaymentInput): Promise<CancelPaymentOutput> {
     try {
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const reference = paymentSessionData?.reference as string;
       if (!reference) {
         return { data: paymentSessionData };
@@ -171,6 +169,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async capturePayment({
     data: paymentSessionData,
   }: CapturePaymentInput): Promise<CapturePaymentOutput> {
+
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return { data: paymentSessionData };
@@ -303,8 +302,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
       typeof webhookData.rawData === "string"
         ? webhookData.rawData
         : webhookData.rawData.toString("utf8");
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const body = JSON.parse(rawBody);
 

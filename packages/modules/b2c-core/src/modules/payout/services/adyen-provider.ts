@@ -122,27 +122,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         `[Adyen] Processing payout for transaction with ID ${transaction_id}`
       );
 
-      // TODO: Reference from payment session and webhook data should be the same,
-      // currently they don't match.
-      // specifically, merchantReference from webhook and payment_session.id are different.
-      console.log("--------------------------------");
-      console.log("payment_session", payment_session);
-      console.log("--------------------------------");
-      console.log("webhook_data", webhook_data);
-      console.log("--------------------------------");
-      console.log("this.config_", this.config_);
-      console.log("--------------------------------");
-      console.log("amount", amount);
-      console.log("amount smallest unit", getSmallestUnit(amount, currency));
-      console.log("commission_amount", commission_amount);
-      console.log("commission_amount smallest unit", getSmallestUnit(commission_amount, currency));
-      console.log("--------------------------------");
-      console.log("currency", currency);
-      console.log("account_reference_id", account_reference_id);
-      console.log("transaction_id", transaction_id);
-      console.log("source_transaction", source_transaction);
-      console.log("--------------------------------");
-
       if (!webhook_data || !webhook_data.pspReference) {
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
