@@ -14,6 +14,7 @@ type StepInput = {
   seller_amount: number;
   commission_amount: number;
   currency_code: string;
+  pspReference: string;
 };
 
 export const capturePaymentWithSplitsStep = createStep(
@@ -94,34 +95,10 @@ export const capturePaymentWithSplitsStep = createStep(
 
     const balanceAccountId = payoutAccount.data?.balance_account?.id;
 
-    // Get the webhook data to extract pspReference
-    // Use the actual payment_session_id, not the input which might be a payment_id
-    const { data: webhooks } = await query.graph({
-      entity: "payment_webhook",
-      fields: ["raw_payload", "provider_id"],
-      filters: {
-        reference: paymentSession.id,
-      },
-    });
-
-    if (!webhooks || webhooks.length === 0) {
+    if (!balanceAccountId) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `No webhook found for payment session ${paymentSession.id}`
-      );
-    }
-
-    const webhook = webhooks[0];
-    const payload = webhook.raw_payload;
-
-    // Extract pspReference from Adyen webhook
-    const pspReference =
-      payload?.notificationItems?.[0]?.NotificationRequestItem?.pspReference;
-
-    if (!pspReference) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        "pspReference not found in webhook payload"
+        `Balance account ID not found for payout account ${seller_payout_account_id}`
       );
     }
 
@@ -171,7 +148,7 @@ export const capturePaymentWithSplitsStep = createStep(
       // Capture the payment with idempotency key
       const response =
         await checkoutAPI.ModificationsApi.captureAuthorisedPayment(
-          pspReference,
+          input.pspReference,
           paymentCaptureRequest,
           {
             idempotencyKey: `capture-${input.order_id}`,
@@ -183,7 +160,7 @@ export const capturePaymentWithSplitsStep = createStep(
       );
 
       return new StepResponse({
-        pspReference,
+        pspReference: input.pspReference,
         status: response.status,
         reference: response.reference,
         seller_amount: input.seller_amount,

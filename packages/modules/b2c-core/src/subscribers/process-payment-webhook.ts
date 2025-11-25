@@ -80,6 +80,7 @@ export default async function processPaymentWebhookHandler({
           container,
           input: {
             payment_session_id: merchantReference, // merchantReference is the payment_session_id
+            pspReference: pspReference, // pspReference from Adyen webhook
           },
         });
 

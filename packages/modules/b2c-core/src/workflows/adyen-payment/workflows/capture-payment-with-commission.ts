@@ -7,6 +7,7 @@ import { calculatePaymentSplitStep, capturePaymentWithSplitsStep } from "../step
 
 type WorkflowInput = {
   payment_session_id: string;
+  pspReference: string;
 };
 
 export const capturePaymentWithCommissionWorkflow = createWorkflow(
@@ -24,6 +25,7 @@ export const capturePaymentWithCommissionWorkflow = createWorkflow(
       seller_amount: splitData.seller_amount,
       commission_amount: splitData.commission_amount,
       currency_code: splitData.currency_code,
+      pspReference: input.pspReference,
     });
 
     return new WorkflowResponse({
