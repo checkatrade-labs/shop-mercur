@@ -74,6 +74,26 @@ export const capturePaymentWithSplitsStep = createStep(
       );
     }
 
+    // get payout account by seller_payout_account_id
+    const {
+      data: [payoutAccount],
+    } = await query.graph({
+      entity: "payout_account",
+      fields: ["data"],
+      filters: {
+        id: seller_payout_account_id,
+      },
+    });
+
+    if (!payoutAccount) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Payout account ${seller_payout_account_id} not found`
+      );
+    }
+
+    const balanceAccountId = payoutAccount.data?.balance_account?.id;
+
     // Get the webhook data to extract pspReference
     // Use the actual payment_session_id, not the input which might be a payment_id
     const { data: webhooks } = await query.graph({
@@ -126,7 +146,7 @@ export const capturePaymentWithSplitsStep = createStep(
         {
           type: Split.TypeEnum.BalanceAccount,
           reference: crypto.randomUUID(),
-          account: seller_payout_account_id,
+          account: balanceAccountId,
           amount: {
             currency: input.currency_code.toUpperCase(),
             value: input.seller_amount,
