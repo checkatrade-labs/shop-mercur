@@ -21,9 +21,7 @@ export default async function paymentCapturedHandler({
     },
   });
 
-  logger.info(
-    `[Payment Captured] Commission calculation completed: ${JSON.stringify(result.result, null, 2)}`
-  );
+  logger.info(`[Payment Captured] Commission calculation completed`);
 }
 
 export const config: SubscriberConfig = {
