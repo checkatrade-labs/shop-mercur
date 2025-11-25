@@ -1,6 +1,7 @@
 import type { AuthenticatedMedusaRequest, MedusaResponse } from '@medusajs/framework'
-import { MedusaError, Modules } from '@medusajs/framework/utils'
+import { ContainerRegistrationKeys, MedusaError, Modules } from '@medusajs/framework/utils'
 import { SELLER_MODULE, SellerModuleService } from '@mercurjs/b2c-core/modules/seller'
+import sellerStockLocationLink from '@mercurjs/b2c-core/links/seller-stock-location'
 import csvParser from 'csv-parser'
 import { Readable } from 'stream'
 import { groupByParentSKU, validateParentGroup, type CSVRow } from '../../../../lib/csv-parser'
@@ -80,9 +81,9 @@ export async function POST(
   try {
     // 1. Get seller from actor_id (member)
     const sellerModule = req.scope.resolve<SellerModuleService>(SELLER_MODULE)
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
     
     // Fetch seller by actor_id - in b2c-core, actor_id is the member ID
-    const query = req.scope.resolve('query')
     const { data: sellers } = await query.graph({
       entity: 'seller',
       fields: ['id', 'name'],
@@ -112,20 +113,23 @@ export async function POST(
       )
     }
 
-    // 3. Get seller's default stock location
-    const stockLocationModule = req.scope.resolve(Modules.STOCK_LOCATION)
-    const stockLocations = await stockLocationModule.listStockLocations({
-      name: { $ilike: `%${sellerId}%` }
+    // 3. Get seller's default stock location via link query
+    const { data: sellerLocations } = await query.graph({
+      entity: sellerStockLocationLink.entryPoint,
+      fields: ['stock_location.id'],
+      filters: {
+        seller_id: sellerId
+      }
     })
 
-    if (!stockLocations || stockLocations.length === 0) {
+    if (!sellerLocations || sellerLocations.length === 0) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         'Seller has no stock location. Please create one first.'
       )
     }
 
-    const stockLocationId = stockLocations[0].id
+    const stockLocationId = sellerLocations[0].stock_location.id
 
     // 3. Get default sales channel
     const salesChannelModule = req.scope.resolve(Modules.SALES_CHANNEL)
