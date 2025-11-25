@@ -118,70 +118,26 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     webhook_data,
   }: ProcessPayoutInput): Promise<ProcessPayoutResponse> {
     try {
+      // For Adyen, the split payment is already handled during payment initialization
+      // via the splits parameter in the payment session creation.
+      // The commission and seller amounts were already distributed when the payment was captured.
+      // Therefore, we don't need to perform any additional payout operations here.
       this.logger_.info(
-        `[Adyen] Processing payout for transaction with ID ${transaction_id}`
-      );
-
-      if (!webhook_data || !webhook_data.pspReference) {
-        throw new MedusaError(
-          MedusaError.Types.INVALID_DATA,
-          `No webhook data or pspReference provided`
-        );
-      }
-
-      const pspReference = webhook_data.pspReference as string;
-
-      // Get seller's Adyen balance account from payment session data
-      const sessionData = payment_session.data as Record<string, any>;
-      const sellerAdyenBalance = sessionData?.seller_payout_account_id;
-
-      if (!sellerAdyenBalance) {
-        throw new MedusaError(
-          MedusaError.Types.INVALID_DATA,
-          `No seller_payout_account_id found in payment session data`
-        );
-      }
-
-      this.logger_.info(
-        `[Adyen] Updating authorized amount with pspReference: ${pspReference}, sellerBalance: ${sellerAdyenBalance}`
-      );
-
-      // Update the authorized amount with splits
-      const updateResponse = await this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
-        pspReference,
-        {
-          merchantAccount: this.config_.adyenMerchantAccount,
-          amount: {
-            currency: currency,
-            value: getSmallestUnit(amount, currency),
-          },
-          reference: transaction_id,
-          splits: [
-            {
-              type: Types.checkout.Split.TypeEnum.BalanceAccount,
-              account: sellerAdyenBalance as string,
-              amount: {
-                currency: currency,
-                value: getSmallestUnit(amount, currency),
-              },
-            },
-            {
-              type: Types.checkout.Split.TypeEnum.Commission,
-              amount: {
-                currency: currency,
-                value: getSmallestUnit(commission_amount, currency),
-              },
-            },
-          ],
-        }
-      );
-
-      this.logger_.info(
-        `[Adyen] Successfully updated authorized amount, response: ${updateResponse.pspReference}`
+        `[Adyen] Payout already processed during payment initialization via split payments. ` +
+          `Commission: ${commission_amount} ${currency}, Seller amount: ${amount} ${currency}`
       );
 
       return {
-        data: updateResponse as unknown as Record<string, unknown>,
+        data: {
+          transaction_id,
+          amount,
+          account_reference_id,
+          source_transaction,
+          commission_amount,
+          currency,
+          note: "Payout was automatically processed during payment authorization via Adyen split payments",
+          session_data: payment_session.data as Record<string, any>,
+        } as unknown as Record<string, unknown>,
       };
     } catch (error) {
       this.logger_.error("[Adyen] Error occurred while creating payout", error);
