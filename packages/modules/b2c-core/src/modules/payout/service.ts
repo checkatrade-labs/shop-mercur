@@ -9,7 +9,7 @@ import {
   MedusaService,
 } from "@medusajs/framework/utils";
 
-import { Onboarding, Payout, PayoutAccount, PayoutReversal } from "./models";
+import { Onboarding, Payout, PayoutAccount, PayoutReversal, PaymentWebhook } from "./models";
 import {
   CreateOnboardingDTO,
   CreatePayoutAccountDTO,
@@ -31,6 +31,7 @@ class PayoutModuleService extends MedusaService({
   PayoutReversal,
   PayoutAccount,
   Onboarding,
+  PaymentWebhook,
 }) {
   protected providers_: Map<string, IPayoutProvider>;
 
@@ -255,6 +256,7 @@ class PayoutModuleService extends MedusaService({
       transaction_id,
       source_transaction,
       payment_session,
+      webhook_data,
     } = input;
 
     const payoutAccount = await this.retrievePayoutAccount(account_id);
@@ -275,6 +277,7 @@ class PayoutModuleService extends MedusaService({
       transaction_id,
       source_transaction,
       payment_session,
+      webhook_data,
     });
 
     // @ts-expect-error BigNumber incompatible interface
@@ -343,6 +346,31 @@ class PayoutModuleService extends MedusaService({
   ) {
     const provider = this.getProvider(payment_provider_id);
     return await provider.getWebhookActionAndData(input);
+  }
+
+  @InjectTransactionManager()
+  async storePaymentWebhook(
+    {
+      provider_id,
+      reference,
+      raw_payload,
+    }: {
+      provider_id: string;
+      reference: string;
+      raw_payload: Record<string, unknown>;
+    },
+    @MedusaContext() sharedContext?: Context<EntityManager>
+  ) {
+    const webhook = await this.createPaymentWebhooks(
+      {
+        provider_id,
+        reference,
+        raw_payload,
+      },
+      sharedContext
+    );
+
+    return webhook;
   }
 }
 

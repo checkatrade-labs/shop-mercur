@@ -1,0 +1,1 @@
+{"version":3,"file":"algolia-entity.d.ts","sourceRoot":"","sources":["../../../../src/types/algolia/algolia-entity.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,cAAc,EAAE,MAAM,mBAAmB,CAAA;AAClD,OAAO,EAAE,aAAa,EAAE,MAAM,kBAAkB,CAAA;AAEhD,MAAM,MAAM,aAAa,GAAG,cAAc,GAAG,aAAa,CAAA"}

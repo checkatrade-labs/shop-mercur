@@ -1,0 +1,1 @@
+{"version":3,"file":"mutations.d.ts","sourceRoot":"","sources":["../../../../src/types/wishlist/mutations.ts"],"names":[],"mappings":"AAAA,MAAM,MAAM,iBAAiB,GAAG;IAC9B,SAAS,EAAE,SAAS,CAAA;IACpB,YAAY,EAAE,MAAM,CAAA;IACpB,WAAW,EAAE,MAAM,CAAA;CACpB,CAAA;AAED,MAAM,MAAM,iBAAiB,GAAG;IAC9B,EAAE,EAAE,MAAM,CAAA;IACV,YAAY,EAAE,MAAM,CAAA;CACrB,CAAA"}

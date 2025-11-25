@@ -41,7 +41,6 @@ import {
 
 type Options = {
   apiKey: string;
-  webhookSecret: string;
 
   adyenMerchantAccount: string;
   adyenThemeId: string;
@@ -86,6 +85,8 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     return { status: PaymentSessionStatus.CAPTURED, data: {} };
   }
 
@@ -119,6 +120,10 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
         firstName: input.context?.customer?.first_name as string,
         lastName: input.context?.customer?.last_name as string,
       },
+      // NOTE: This is required for split payments to be captured manually after the order is completed
+      additionalData: {
+        manualCapture: "true",
+      },
       metadata: {
         cart_id: data?.cart_id as string,
         session_id: data?.session_id as string,
@@ -134,6 +139,8 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async authorizePayment(
     data: AuthorizePaymentInput
   ): Promise<AuthorizePaymentOutput> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     return { status: PaymentSessionStatus.AUTHORIZED, data: data.data };
   }
 
@@ -164,7 +171,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async capturePayment({
     data: paymentSessionData,
   }: CapturePaymentInput): Promise<CapturePaymentOutput> {
-    return { data: paymentSessionData as unknown as PaymentProviderOutput };
+    return { data: paymentSessionData };
   }
 
   deletePayment(data: DeletePaymentInput): Promise<DeletePaymentOutput> {
@@ -207,7 +214,11 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
   }: RetrievePaymentInput): Promise<RetrievePaymentOutput> {
     try {
-      return { data: paymentSessionData as unknown as PaymentProviderOutput };
+
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "Retrieve payment not implemented"
+      );
 
       if (!paymentSessionData || !paymentSessionData?.id) {
         throw new MedusaError(
@@ -349,47 +360,21 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     const baseData = {
       success: isSuccess,
       reason: notification.reason,
-      session_id: notification.merchantReference,
+      session_id: notification.additionalData["metadata.session_id"] as string,
       amount: amount,
       pspReference: notification.pspReference,
     };
 
     switch (notification.eventCode) {
       case NotificationRequestItem.EventCodeEnum.Authorisation:
-        return {
-          action: isSuccess ? PaymentActions.AUTHORIZED : PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Capture:
-        return {
-          action: isSuccess ? PaymentActions.SUCCESSFUL : PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Cancellation:
-      case NotificationRequestItem.EventCodeEnum.CancelOrRefund:
-        return {
-          action: PaymentActions.CANCELED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Refund:
-      case NotificationRequestItem.EventCodeEnum.RefundFailed:
-      case NotificationRequestItem.EventCodeEnum.CaptureFailed:
-        return {
-          action: PaymentActions.FAILED,
-          data: baseData,
-        };
-
-      case NotificationRequestItem.EventCodeEnum.Pending:
-        return {
-          action: PaymentActions.PENDING,
-          data: baseData,
-        };
+        // Return NOT_SUPPORTED to prevent Medusa's default webhook handler
+        // from trying to complete the cart using the standard workflow.
+        // The custom order-set-placed-payment-capture subscriber handles
+        // payment capture after the split-and-complete-cart workflow completes.
+        return { action: PaymentActions.NOT_SUPPORTED, data: baseData };
 
       default:
-        return { action: PaymentActions.NOT_SUPPORTED };
+        return { action: PaymentActions.NOT_SUPPORTED, data: baseData };
     }
   }
 

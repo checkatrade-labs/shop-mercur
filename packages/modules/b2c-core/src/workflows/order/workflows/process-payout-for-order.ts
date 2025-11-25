@@ -26,7 +26,6 @@ export const processPayoutForOrderWorkflow = createWorkflow(
   function (input: ProcessPayoutForOrderWorkflowInput) {
     validateNoExistingPayoutForOrderStep(input.order_id);
 
-    
     const { data: orders } = useQueryGraphStep({
       entity: "order",
       fields: [
@@ -43,16 +42,17 @@ export const processPayoutForOrderWorkflow = createWorkflow(
 
     const order = transform(orders, (orders) => {
       const transformed = orders[0];
+      const paymentSession =
+        transformed.payment_collections[0].payment_sessions[0];
 
       return {
         seller_id: transformed.seller.id,
         id: transformed.id,
         total: transformed.total,
         currency_code: transformed.currency_code,
-        source_transaction:
-          transformed.payment_collections[0].payment_sessions[0].data
-            .latest_charge,
-        payment_session: transformed.payment_collections[0].payment_sessions[0]
+        source_transaction: paymentSession.data?.latest_charge,
+        payment_session: paymentSession,
+        payment_session_id: paymentSession.id,
       };
     });
 
@@ -68,8 +68,36 @@ export const processPayoutForOrderWorkflow = createWorkflow(
 
     validateSellerPayoutAccountStep(seller);
 
-    const { payout_total, total_commission } = calculatePayoutForOrderStep(input);   
+    const { payout_total, total_commission } =
+      calculatePayoutForOrderStep(input);
 
+    // Query webhook data by payment session reference
+    const { data: webhooks } = useQueryGraphStep({
+      entity: "payment_webhook",
+      fields: ["raw_payload", "provider_id"],
+      filters: {
+        reference: order.payment_session.id,
+      },
+    }).config({ name: "query-payment-webhook" });
+
+    const webhookData = transform(webhooks, (webhooks) => {
+      if (!webhooks || webhooks.length === 0) {
+        return null;
+      }
+      const webhook = webhooks[0];
+      const payload = webhook.raw_payload;
+
+      // Extract pspReference from Adyen webhook
+      const pspReference =
+        payload?.notificationItems?.[0]?.NotificationRequestItem?.pspReference;
+
+      return {
+        pspReference,
+        raw_payload: payload,
+      };
+    });
+
+    // TODO: Conditionally create payout based on provider_id
     const { payout, err: createPayoutErr } = createPayoutStep({
       transaction_id: order.id,
       amount: payout_total,
@@ -78,6 +106,7 @@ export const processPayoutForOrderWorkflow = createWorkflow(
       account_id: seller.payout_account.id,
       payment_session: order.payment_session,
       source_transaction: order.source_transaction,
+      webhook_data: webhookData,
     });
 
     when({ createPayoutErr }, ({ createPayoutErr }) => !createPayoutErr).then(

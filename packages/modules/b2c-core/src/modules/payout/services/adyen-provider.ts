@@ -115,71 +115,29 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     transaction_id,
     source_transaction,
     payment_session,
+    webhook_data,
   }: ProcessPayoutInput): Promise<ProcessPayoutResponse> {
     try {
+      // For Adyen, the split payment is already handled during payment initialization
+      // via the splits parameter in the payment session creation.
+      // The commission and seller amounts were already distributed when the payment was captured.
+      // Therefore, we don't need to perform any additional payout operations here.
       this.logger_.info(
-        `[Adyen] Processing payout for transaction with ID ${transaction_id}`
-      );
-
-      console.log("--------------------------------");
-      console.log("payment_session", payment_session);
-      console.log("--------------------------------");
-      console.log("this.config_", this.config_);
-      console.log("--------------------------------");
-      console.log("amount", amount);
-      console.log("amount smallest unit", getSmallestUnit(amount, currency));
-      console.log("commission_amount", commission_amount);
-      console.log("commission_amount smallest unit", getSmallestUnit(commission_amount, currency));
-      console.log("--------------------------------");
-      console.log("currency", currency);
-      console.log("account_reference_id", account_reference_id);
-      console.log("transaction_id", transaction_id);
-      console.log("source_transaction", source_transaction);
-      console.log("--------------------------------");
-
-      // TODO: We miss pspReference here, we need to get it in order to update the authorised amount.
-      // and also get sellerAdyenBalance in the file `process-payout-for-order.ts`
-      // search line `transformed.payment_collections[0].payment_sessions[0].data`
-      //
-      // this.checkoutApi_.ModificationsApi.updateAuthorisedAmount(
-      //   pspReference,
-      //   {
-      //     merchantAccount: this.config_.adyenMerchantAccount,
-      //     amount: {
-      //       currency: currency,
-      //       value: getSmallestUnit(amount, currency),
-      //     },
-      //     reference: transaction_id,
-      //     splits: [
-      //       {
-      //         type: Types.checkout.Split.TypeEnum.BalanceAccount,
-      //         reference: uuidv4(),
-      //         account: sellerAdyenBalance,
-      //         amount: {
-      //           currency: currency,
-      //           value: getSmallestUnit(amount, currency),
-      //         },
-      //       },
-      //       {
-      //         type: Types.checkout.Split.TypeEnum.Commission,
-      //         reference: uuidv4(),
-      //         amount: {
-      //           currency: currency,
-      //           value: getSmallestUnit(commission_amount, currency),
-      //         },
-      //       },
-      //     ],
-      //   }
-      // );
-
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        "Adyen createPayout not yet implemented"
+        `[Adyen] Payout already processed during payment initialization via split payments. ` +
+          `Commission: ${commission_amount} ${currency}, Seller amount: ${amount} ${currency}`
       );
 
       return {
-        data: {} as unknown as Record<string, unknown>,
-        // data: transfer as unknown as Record<string, unknown>,
+        data: {
+          transaction_id,
+          amount,
+          account_reference_id,
+          source_transaction,
+          commission_amount,
+          currency,
+          note: "Payout was automatically processed during payment authorization via Adyen split payments",
+          session_data: payment_session.data as Record<string, any>,
+        } as unknown as Record<string, unknown>,
       };
     } catch (error) {
       this.logger_.error("[Adyen] Error occurred while creating payout", error);
@@ -195,14 +153,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
     context,
     account_id,
   }: CreatePayoutAccountInput): Promise<CreatePayoutAccountResponse> {
-    console.log("--------------------------------");
-    console.log("context", context);
-    console.log("--------------------------------");
-    console.log("payment_provider_id", payment_provider_id);
-    console.log("account_id", account_id);
-    console.log("process.env.STOREFRONT_URL", process.env.STOREFRONT_URL);
-    console.log("--------------------------------");
-
     let legalEntity: Types.legalEntityManagement.LegalEntity | undefined;
     let accountHolder: Types.balancePlatform.AccountHolder | undefined;
     let balanceAccount: Types.balancePlatform.BalanceAccount | undefined;
