@@ -16,8 +16,8 @@ type StepInput = {
   currency_code: string;
 };
 
-export const captureAdyenPaymentStep = createStep(
-  "capture-adyen-payment",
+export const capturePaymentWithSplitsStep = createStep(
+  "capture-payment-with-splits",
   async (input: StepInput, { container }) => {
     const query = container.resolve(ContainerRegistrationKeys.QUERY);
 

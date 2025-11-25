@@ -1,2 +1,2 @@
-export * from './calculate-commission-for-payment'
-export * from './capture-adyen-payment'
+export * from './calculate-payment-split'
+export * from './capture-payment-with-splits'

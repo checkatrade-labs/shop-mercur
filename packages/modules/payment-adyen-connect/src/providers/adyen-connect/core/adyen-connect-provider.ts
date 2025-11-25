@@ -85,7 +85,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async getPaymentStatus(
     input: GetPaymentStatusInput
   ): Promise<GetPaymentStatusOutput> {
-
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return { status: PaymentSessionStatus.CAPTURED, data: {} };
@@ -123,7 +122,7 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
       },
       // NOTE: This is required for split payments to be captured manually after the order is completed
       additionalData: {
-        "manualCapture": "true"
+        manualCapture: "true",
       },
       metadata: {
         cart_id: data?.cart_id as string,
@@ -140,7 +139,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async authorizePayment(
     data: AuthorizePaymentInput
   ): Promise<AuthorizePaymentOutput> {
-
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return { status: PaymentSessionStatus.AUTHORIZED, data: data.data };
@@ -173,9 +171,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
   async capturePayment({
     data: paymentSessionData,
   }: CapturePaymentInput): Promise<CapturePaymentOutput> {
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     return { data: paymentSessionData };
   }
 
@@ -188,9 +183,6 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     amount,
   }: RefundPaymentInput): Promise<RefundPaymentOutput> {
     try {
-
-      return { data: paymentSessionData };
-
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
         "Refund payment not implemented"
@@ -222,7 +214,11 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
     data: paymentSessionData,
   }: RetrievePaymentInput): Promise<RetrievePaymentOutput> {
     try {
-      return { data: paymentSessionData as unknown as PaymentProviderOutput };
+
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "Retrieve payment not implemented"
+      );
 
       if (!paymentSessionData || !paymentSessionData?.id) {
         throw new MedusaError(

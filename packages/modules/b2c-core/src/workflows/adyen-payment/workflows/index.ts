@@ -1,1 +1,1 @@
-export * from './calculate-commission-for-payment'
+export * from './capture-payment-with-commission'

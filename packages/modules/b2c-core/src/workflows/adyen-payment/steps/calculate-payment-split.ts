@@ -9,8 +9,8 @@ type StepInput = {
   payment_session_id: string;
 };
 
-export const calculateCommissionForPaymentStep = createStep(
-  "calculate-commission-for-payment",
+export const calculatePaymentSplitStep = createStep(
+  "calculate-payment-split",
   async (input: StepInput, { container }) => {
     const query = container.resolve(ContainerRegistrationKeys.QUERY);
 

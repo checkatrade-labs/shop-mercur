@@ -5,7 +5,7 @@ import { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/noti
 import { PAYOUT_MODULE } from "../modules/payout";
 import PayoutModuleService from "../modules/payout/service";
 import { PaymentProvider } from "../api/vendor/payout-account/types";
-import { calculateCommissionForPaymentWorkflow } from "../workflows/adyen-payment/workflows/calculate-commission-for-payment";
+import { capturePaymentWithCommissionWorkflow } from "../workflows/adyen-payment/workflows/capture-payment-with-commission";
 
 export default async function processPaymentWebhookHandler({
   event,
@@ -75,8 +75,8 @@ export default async function processPaymentWebhookHandler({
       );
 
       try {
-        // Run the workflow to calculate commission and capture payment with splits
-        const result = await calculateCommissionForPaymentWorkflow.run({
+        // Run the workflow to calculate payment split and capture with commission
+        const result = await capturePaymentWithCommissionWorkflow.run({
           container,
           input: {
             payment_session_id: merchantReference, // merchantReference is the payment_session_id
@@ -84,7 +84,7 @@ export default async function processPaymentWebhookHandler({
         });
 
         logger.info(
-          `[Process Payment Webhook] Commission calculation and capture completed for ${merchantReference}`
+          `[Process Payment Webhook] Payment captured with commission split for ${merchantReference}`
         );
       } catch (error) {
 
