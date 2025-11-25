@@ -14,6 +14,10 @@ export const calculateCommissionForPaymentStep = createStep(
   async (input: StepInput, { container }) => {
     const query = container.resolve(ContainerRegistrationKeys.QUERY);
 
+    console.log('============== START CALCULATE COMMISSION FOR PAYMENT ======================')
+    console.log(JSON.stringify(input, null, 2))
+    console.log('============== END CALCULATE COMMISSION FOR PAYMENT ======================')
+
     let paymentSession: PaymentSessionDTO | undefined;
 
     try {

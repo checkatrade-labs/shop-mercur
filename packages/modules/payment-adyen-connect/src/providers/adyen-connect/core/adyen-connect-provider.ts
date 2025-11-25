@@ -121,6 +121,10 @@ abstract class AdyenConnectProvider extends AbstractPaymentProvider<Options> {
         firstName: input.context?.customer?.first_name as string,
         lastName: input.context?.customer?.last_name as string,
       },
+      // NOTE: This is required for split payments to be captured manually after the order is completed
+      additionalData: {
+        "manualCapture": "true"
+      },
       metadata: {
         cart_id: data?.cart_id as string,
         session_id: data?.session_id as string,
