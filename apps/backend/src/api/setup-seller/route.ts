@@ -148,6 +148,19 @@ export async function GET(
       cursor: not-allowed;
     }
     
+    .button-danger {
+      background: #f56565;
+      margin-top: 12px;
+    }
+    
+    .button-danger:hover {
+      background: #e53e3e;
+    }
+    
+    .button-danger:disabled {
+      background: #cbd5e0;
+    }
+    
     .result {
       margin-top: 24px;
       padding: 20px;
@@ -265,6 +278,12 @@ export async function GET(
               <div class="result-label">Stock Location Name:</div>
               <div class="result-value">\${result.data.stockLocation.name}</div>
             </div>
+            
+            \${result.data.alreadyExists ? \`
+              <button class="button-danger" onclick="deleteStockLocation('\${result.data.seller.email}')" id="deleteBtn">
+                🗑️ Delete Stock Location
+              </button>
+            \` : ''}
           \` : ''}
         \`;
         
@@ -275,6 +294,55 @@ export async function GET(
         statusEl.className = 'status error';
         statusEl.innerHTML = \`<span>❌ Error: \${error.message}</span>\`;
         submitBtn.disabled = false;
+      }
+    }
+    
+    async function deleteStockLocation(email) {
+      const statusEl = document.getElementById('status');
+      const resultEl = document.getElementById('result');
+      const deleteBtn = document.getElementById('deleteBtn');
+      
+      if (!confirm('Are you sure you want to delete this stock location? This action cannot be undone.')) {
+        return;
+      }
+      
+      // Show loading state
+      statusEl.className = 'status loading';
+      statusEl.innerHTML = '<div class="spinner"></div><span>Deleting stock location...</span>';
+      deleteBtn.disabled = true;
+      
+      try {
+        const response = await fetch('/setup/seller', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to delete stock location');
+        }
+        
+        const result = await response.json();
+        
+        // Show success state
+        statusEl.className = 'status success';
+        statusEl.innerHTML = '<span>✅ Stock location deleted successfully!</span>';
+        
+        // Clear the result and show a message to create a new one
+        resultEl.className = 'result show';
+        resultEl.innerHTML = \`
+          <h3 style="margin-bottom: 16px; color: #1a202c;">Deleted Successfully</h3>
+          <p style="color: #4a5568; margin-bottom: 16px;">The stock location has been deleted. You can now create a new one using the form above.</p>
+        \`;
+        
+      } catch (error) {
+        // Show error state
+        statusEl.className = 'status error';
+        statusEl.innerHTML = \`<span>❌ Error: \${error.message}</span>\`;
+        deleteBtn.disabled = false;
       }
     }
   </script>

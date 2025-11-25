@@ -1,9 +1,12 @@
 import type { MedusaRequest, MedusaResponse } from '@medusajs/framework'
-import { MedusaError, Modules } from '@medusajs/framework/utils'
+import { ContainerRegistrationKeys, MedusaError, Modules } from '@medusajs/framework/utils'
 import { SELLER_MODULE } from '@mercurjs/b2c-core/modules/seller'
 import type { SellerModuleService } from '@mercurjs/b2c-core/modules/seller'
 import { createLocationFulfillmentSetAndAssociateWithSellerWorkflow } from '@mercurjs/b2c-core/workflows'
-import { createStockLocationsWorkflow } from '@medusajs/medusa/core-flows'
+import { createStockLocationsWorkflow, deleteStockLocationsWorkflow } from '@medusajs/medusa/core-flows'
+
+// Import the link to get the entryPoint
+import sellerStockLocationLink from '@mercurjs/b2c-core/links/seller-stock-location'
 
 /**
  * POST /setup/seller
@@ -62,13 +65,19 @@ export async function POST(
     const seller = existingSellers[0]
     console.log(`Found seller: ${seller.id} - ${seller.name}`)
 
-    // 3. Check if stock location already exists
-    const stockLocationModule = container.resolve(Modules.STOCK_LOCATION)
-    const stockLocations = await stockLocationModule.listStockLocations({
-      name: { $ilike: `%${seller.id}%` }
+    // 3. Check if seller already has a stock location linked
+    const query = container.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: sellerLocations } = await query.graph({
+      entity: sellerStockLocationLink.entryPoint,
+      fields: ['stock_location.id', 'stock_location.name'],
+      filters: {
+        seller_id: seller.id
+      }
     })
     
-    if (stockLocations && stockLocations.length > 0) {
+    if (sellerLocations && sellerLocations.length > 0) {
+      const stockLocation = sellerLocations[0].stock_location
+      
       return res.status(200).json({
         success: true,
         message: 'Seller already has a stock location',
@@ -79,8 +88,8 @@ export async function POST(
             email: seller.email
           },
           stockLocation: {
-            id: stockLocations[0].id,
-            name: stockLocations[0].name
+            id: stockLocation.id,
+            name: stockLocation.name
           },
           alreadyExists: true
         }
@@ -108,7 +117,38 @@ export async function POST(
 
     console.log(`✅ Created stock location: ${stockLocation[0].id}`)
 
-    // 5. Create fulfillment set and associate with seller
+    // 5. Link stock location to seller, fulfillment provider, and sales channel
+    const link = container.resolve(ContainerRegistrationKeys.LINK)
+    await link.create([
+      {
+        [SELLER_MODULE]: {
+          seller_id: seller.id
+        },
+        [Modules.STOCK_LOCATION]: {
+          stock_location_id: stockLocation[0].id
+        }
+      },
+      {
+        [Modules.STOCK_LOCATION]: {
+          stock_location_id: stockLocation[0].id
+        },
+        [Modules.FULFILLMENT]: {
+          fulfillment_provider_id: 'manual_manual'
+        }
+      },
+      {
+        [Modules.SALES_CHANNEL]: {
+          sales_channel_id: salesChannelId
+        },
+        [Modules.STOCK_LOCATION]: {
+          stock_location_id: stockLocation[0].id
+        }
+      }
+    ])
+
+    console.log(`✅ Linked stock location to seller`)
+
+    // 6. Create fulfillment set and associate with seller
     await createLocationFulfillmentSetAndAssociateWithSellerWorkflow(container).run({
       input: {
         location_id: stockLocation[0].id,
@@ -143,6 +183,100 @@ export async function POST(
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       error.message || 'Failed to create stock location'
+    )
+  }
+}
+
+/**
+ * DELETE /setup/seller
+ * 
+ * Deletes stock location for a seller
+ * 
+ * Body:
+ * {
+ *   "email": "seller@example.com"
+ * }
+ * 
+ * @returns Success message
+ */
+export async function DELETE(
+  req: MedusaRequest,
+  res: MedusaResponse
+) {
+  try {
+    const container = req.scope
+    const { email } = req.body as {
+      email?: string
+    }
+
+    // Validate inputs
+    if (!email) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        'Seller email is required'
+      )
+    }
+
+    // 1. Find existing seller by email
+    const sellerModule = container.resolve<SellerModuleService>(SELLER_MODULE)
+    const existingSellers = await sellerModule.listSellers({ email })
+    
+    if (!existingSellers || existingSellers.length === 0) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        `Seller with email "${email}" not found.`
+      )
+    }
+
+    const seller = existingSellers[0]
+    console.log(`Found seller: ${seller.id} - ${seller.name}`)
+
+    // 2. Find stock location linked to seller
+    const query = container.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: sellerLocations } = await query.graph({
+      entity: sellerStockLocationLink.entryPoint,
+      fields: ['stock_location.id'],
+      filters: {
+        seller_id: seller.id
+      }
+    })
+    
+    if (!sellerLocations || sellerLocations.length === 0) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        'Seller does not have a stock location to delete'
+      )
+    }
+
+    const stockLocationId = sellerLocations[0].stock_location.id
+
+    // 3. Delete the stock location (this will also cascade delete links)
+    await deleteStockLocationsWorkflow(container).run({
+      input: {
+        ids: [stockLocationId]
+      }
+    })
+
+    console.log(`✅ Deleted stock location: ${stockLocationId}`)
+
+    res.status(200).json({
+      success: true,
+      message: 'Stock location deleted successfully',
+      data: {
+        seller: {
+          id: seller.id,
+          name: seller.name,
+          email: seller.email
+        },
+        deletedStockLocationId: stockLocationId
+      }
+    })
+  } catch (error: any) {
+    console.error('[Delete Stock Location] Error:', error)
+
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      error.message || 'Failed to delete stock location'
     )
   }
 }
