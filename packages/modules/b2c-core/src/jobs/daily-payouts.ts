@@ -56,7 +56,9 @@ export default async function dailyPayoutsJob(container: MedusaContainer) {
   await eventBus.emit(events, { delay: DELAY_MS })
 }
 
-export const config = {
-  name: 'daily-payouts',
-  schedule: '0 0 * * *' // Every day at midnight
-}
+// For Adyen, the split payment is already handled during payment initialization.
+// Therefore, we don't need to run this job.
+// export const config = {
+//   name: 'daily-payouts',
+//   schedule: '0 0 * * *' // Every day at midnight
+// }
