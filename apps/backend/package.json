@@ -35,7 +35,7 @@
     "@medusajs/medusa": "2.10.2",
     "@mercurjs/algolia": "*",
     "@mercurjs/b2c-core": "file:.yalc/@mercurjs/b2c-core",
-    "@mercurjs/commission": "*",
+    "@mercurjs/commission": "file:.yalc/@mercurjs/commission",
     "@mercurjs/framework": "file:.yalc/@mercurjs/framework",
     "@mercurjs/payment-stripe-connect": "*",
     "@mercurjs/requests": "*",
