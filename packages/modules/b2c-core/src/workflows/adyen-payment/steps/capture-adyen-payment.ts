@@ -1,7 +1,11 @@
 import { StepResponse, createStep } from "@medusajs/framework/workflows-sdk";
-import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils";
+import {
+  ContainerRegistrationKeys,
+  MedusaError,
+} from "@medusajs/framework/utils";
 import { Client, CheckoutAPI, EnvironmentEnum } from "@adyen/api-library";
 import { Split } from "@adyen/api-library/lib/src/typings/checkout/split";
+import { PaymentCaptureRequest } from "@adyen/api-library/lib/src/typings/checkout/models";
 import { logger } from "@medusajs/framework";
 
 type StepInput = {
@@ -16,10 +20,6 @@ export const captureAdyenPaymentStep = createStep(
   "capture-adyen-payment",
   async (input: StepInput, { container }) => {
     const query = container.resolve(ContainerRegistrationKeys.QUERY);
-
-    console.log('============== START CAPTURE ADYEN PAYMENT ======================')
-    console.log(JSON.stringify(input, null, 2))
-    console.log('============== END CAPTURE ADYEN PAYMENT ======================')
 
     // Get payment session to extract seller_payout_account_id
     // The input might be a payment_id or payment_session_id, so try both
@@ -64,7 +64,8 @@ export const captureAdyenPaymentStep = createStep(
       );
     }
 
-    const seller_payout_account_id = paymentSession.data?.seller_payout_account_id;
+    const seller_payout_account_id =
+      paymentSession.data?.seller_payout_account_id;
 
     if (!seller_payout_account_id) {
       throw new MedusaError(
@@ -89,10 +90,6 @@ export const captureAdyenPaymentStep = createStep(
         `No webhook found for payment session ${paymentSession.id}`
       );
     }
-
-    console.log('============== START WEBHOOKS ======================')
-    console.log(JSON.stringify(webhooks, null, 2))
-    console.log('============== END WEBHOOKS ======================')
 
     const webhook = webhooks[0];
     const payload = webhook.raw_payload;
@@ -119,7 +116,7 @@ export const captureAdyenPaymentStep = createStep(
 
     // seller_amount is already in smallest unit (cents) from the commission calculation
     // Prepare capture request with splits: seller's portion + commission
-    const paymentCaptureRequest = {
+    const paymentCaptureRequest: PaymentCaptureRequest = {
       merchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT!,
       amount: {
         value: input.seller_amount + input.commission_amount,
@@ -145,20 +142,25 @@ export const captureAdyenPaymentStep = createStep(
         },
       ],
     };
-    
-    logger.info(`Sending capture request to Adyen with idempotency key: capture-${input.order_id}`);
+
+    logger.info(
+      `Sending capture request to Adyen with idempotency key: capture-${input.order_id}`
+    );
 
     try {
       // Capture the payment with idempotency key
-      const response = await checkoutAPI.ModificationsApi.captureAuthorisedPayment(
-        pspReference,
-        paymentCaptureRequest,
-        {
-          idempotencyKey: `capture-${input.order_id}`,
-        }
-      );
+      const response =
+        await checkoutAPI.ModificationsApi.captureAuthorisedPayment(
+          pspReference,
+          paymentCaptureRequest,
+          {
+            idempotencyKey: `capture-${input.order_id}`,
+          }
+        );
 
-      logger.info(`[Capture Adyen Payment] Response status: ${response.status}`);
+      logger.info(
+        `[Capture Adyen Payment] Response status: ${response.status}`
+      );
 
       return new StepResponse({
         pspReference,
@@ -169,7 +171,6 @@ export const captureAdyenPaymentStep = createStep(
         seller_payout_account_id,
         currency_code: input.currency_code,
       });
-
     } catch (error) {
       throw new MedusaError(
         MedusaError.Types.PAYMENT_AUTHORIZATION_ERROR,
