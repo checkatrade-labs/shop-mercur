@@ -198,20 +198,16 @@ export async function findAndTransformAlgoliaProducts(
     // This ensures compatibility with the Zod validator and handles cases where
     // fields might be null/undefined even if they were set during import
     const variantsWithDefaults = product.variants?.map((variant: any) => {
+      // Filter out options with null option objects (they're not useful for Algolia)
+      const validOptions = variant.options?.filter((opt: any) => opt.option !== null && opt.option !== undefined) || [];
+      
       const variantWithDefaults: any = {
         ...variant,
         // Ensure boolean fields have default values
         allow_backorder: variant.allow_backorder ?? false,
         manage_inventory: variant.manage_inventory ?? false,
-        // Ensure options structure is complete (handle null option gracefully)
-        options: variant.options?.map((opt: any) => {
-          if (!opt.option) {
-            return {
-              id: opt.id ?? undefined,
-              value: opt.value ?? '',
-              option: null,
-            };
-          }
+        // Ensure options structure is complete (only include options with valid option objects)
+        options: validOptions.map((opt: any) => {
           return {
             id: opt.id ?? undefined,
             value: opt.value ?? '',
@@ -220,7 +216,7 @@ export async function findAndTransformAlgoliaProducts(
               title: opt.option.title ?? '',
             },
           };
-        }) ?? [],
+        }),
         // Ensure prices have rules_count (default to 0 if missing)
         prices: variant.prices?.map((price: any) => ({
           ...price,
