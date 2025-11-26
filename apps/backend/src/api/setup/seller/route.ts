@@ -5,8 +5,9 @@ import type { SellerModuleService } from '@mercurjs/b2c-core/modules/seller'
 import { createLocationFulfillmentSetAndAssociateWithSellerWorkflow } from '@mercurjs/b2c-core/workflows'
 import { createStockLocationsWorkflow, deleteStockLocationsWorkflow } from '@medusajs/medusa/core-flows'
 
-// Import the link to get the entryPoint
+// Import the links to get the entryPoints
 import sellerStockLocationLink from '@mercurjs/b2c-core/links/seller-stock-location'
+import sellerFulfillmentSetLink from '@mercurjs/b2c-core/links/seller-fulfillment-set'
 
 /**
  * POST /setup/seller
@@ -149,18 +150,136 @@ export async function POST(
     console.log(`✅ Linked stock location to seller`)
 
     // 6. Create fulfillment set and associate with seller
-    await createLocationFulfillmentSetAndAssociateWithSellerWorkflow(container).run({
-      input: {
-        location_id: stockLocation[0].id,
-        fulfillment_set_data: {
-          name: stockLocation[0].name,
-          type: 'pick-up'
-        },
-        seller_id: seller.id
+    const fulfillmentSetName = stockLocation[0].name
+    
+    // Check if fulfillment set with this name already exists
+    const { data: existingFulfillmentSets } = await query.graph({
+      entity: 'fulfillment_set',
+      fields: ['id', 'name'],
+      filters: {
+        name: fulfillmentSetName
       }
     })
-
-    console.log(`✅ Created fulfillment set and linked to seller`)
+    
+    if (existingFulfillmentSets && existingFulfillmentSets.length > 0) {
+      // Fulfillment set already exists, link it to seller and stock location
+      const fulfillmentSetId = existingFulfillmentSets[0].id
+      console.log(`ℹ️  Fulfillment set "${fulfillmentSetName}" already exists, linking to seller and stock location`)
+      
+      const link = container.resolve(ContainerRegistrationKeys.LINK)
+      
+      // Check if links already exist
+      const { data: existingSellerLinks } = await query.graph({
+        entity: sellerFulfillmentSetLink.entryPoint,
+        fields: ['fulfillment_set_id'],
+        filters: {
+          seller_id: seller.id,
+          fulfillment_set_id: fulfillmentSetId
+        }
+      })
+      
+      // Check stock location fulfillment set link (using query on stock_location with fulfillment_sets)
+      const { data: stockLocationData } = await query.graph({
+        entity: 'stock_location',
+        fields: ['fulfillment_sets.id'],
+        filters: {
+          id: stockLocation[0].id
+        }
+      })
+      
+      const hasLocationLink = stockLocationData && stockLocationData.length > 0 && 
+        stockLocationData[0].fulfillment_sets?.some((fs: any) => fs.id === fulfillmentSetId)
+      
+      // Create links if they don't exist
+      const linksToCreate: any[] = []
+      
+      if (!existingSellerLinks || existingSellerLinks.length === 0) {
+        linksToCreate.push({
+          [SELLER_MODULE]: {
+            seller_id: seller.id
+          },
+          [Modules.FULFILLMENT]: {
+            fulfillment_set_id: fulfillmentSetId
+          }
+        })
+      }
+      
+      if (!hasLocationLink) {
+        linksToCreate.push({
+          [Modules.STOCK_LOCATION]: {
+            stock_location_id: stockLocation[0].id
+          },
+          [Modules.FULFILLMENT]: {
+            fulfillment_set_id: fulfillmentSetId
+          }
+        })
+      }
+      
+      if (linksToCreate.length > 0) {
+        await link.create(linksToCreate)
+        console.log(`✅ Linked existing fulfillment set to seller and stock location`)
+      } else {
+        console.log(`ℹ️  Fulfillment set already linked to seller and stock location`)
+      }
+    } else {
+      // Create new fulfillment set
+      try {
+        await createLocationFulfillmentSetAndAssociateWithSellerWorkflow(container).run({
+          input: {
+            location_id: stockLocation[0].id,
+            fulfillment_set_data: {
+              name: fulfillmentSetName,
+              type: 'pick-up'
+            },
+            seller_id: seller.id
+          }
+        })
+        console.log(`✅ Created fulfillment set and linked to seller`)
+      } catch (workflowError: any) {
+        // If workflow fails due to duplicate name (race condition), try to link existing one
+        if (workflowError.message?.includes('already exists')) {
+          console.log(`⚠️  Fulfillment set creation failed (may have been created concurrently), attempting to link existing one...`)
+          
+          // Re-query for fulfillment set
+          const { data: retryFulfillmentSets } = await query.graph({
+            entity: 'fulfillment_set',
+            fields: ['id'],
+            filters: {
+              name: fulfillmentSetName
+            }
+          })
+          
+          if (retryFulfillmentSets && retryFulfillmentSets.length > 0) {
+            const fulfillmentSetId = retryFulfillmentSets[0].id
+            const link = container.resolve(ContainerRegistrationKeys.LINK)
+            
+            await link.create([
+              {
+                [SELLER_MODULE]: {
+                  seller_id: seller.id
+                },
+                [Modules.FULFILLMENT]: {
+                  fulfillment_set_id: fulfillmentSetId
+                }
+              },
+              {
+                [Modules.STOCK_LOCATION]: {
+                  stock_location_id: stockLocation[0].id
+                },
+                [Modules.FULFILLMENT]: {
+                  fulfillment_set_id: fulfillmentSetId
+                }
+              }
+            ])
+            console.log(`✅ Linked existing fulfillment set after race condition`)
+          } else {
+            throw workflowError
+          }
+        } else {
+          throw workflowError
+        }
+      }
+    }
 
     res.status(200).json({
       success: true,

@@ -179,16 +179,29 @@ export async function POST(
 
     // 6. Group by Parent SKU
     const groups = groupByParentSKU(rows)
+    console.log(`\n📦 [Product Import] Found ${groups.length} unique products (parent SKUs) in CSV`)
 
     // 7. Validate groups
+    const validationFailures: Array<{ parentSKU: string; reasons: string[] }> = []
     const validGroups = groups.filter(group => {
       const validation = validateParentGroup(group)
       if (!validation.valid) {
-        console.warn(`Skipping ${group.parentSKU}: ${validation.errors.join(', ')}`)
+        validationFailures.push({
+          parentSKU: group.parentSKU,
+          reasons: validation.errors
+        })
         return false
       }
       return true
     })
+
+    // Log validation failures
+    if (validationFailures.length > 0) {
+      console.log(`\n❌ [Product Import] ${validationFailures.length} products failed validation:`)
+      validationFailures.forEach(({ parentSKU, reasons }) => {
+        console.log(`   - ${parentSKU}: ${reasons.join('; ')}`)
+      })
+    }
 
     if (validGroups.length === 0) {
       throw new MedusaError(
@@ -196,6 +209,8 @@ export async function POST(
         'No valid products found in CSV'
       )
     }
+
+    console.log(`\n✅ [Product Import] ${validGroups.length} products passed validation, starting import...`)
 
     // 8. Import products
     const importResults = await importParentGroups(
@@ -209,6 +224,31 @@ export async function POST(
       req.scope
     )
 
+    // 8b. Log import summary
+    console.log(`\n${'='.repeat(60)}`)
+    console.log(`📊 [Product Import] FINAL SUMMARY`)
+    console.log(`${'='.repeat(60)}`)
+    console.log(`   Total unique products in CSV: ${groups.length}`)
+    console.log(`   ✅ Successfully imported: ${importResults.success}`)
+    console.log(`   ❌ Failed during import: ${importResults.failed}`)
+    console.log(`   ⚠️  Skipped (validation errors): ${validationFailures.length}`)
+    
+    if (validationFailures.length > 0) {
+      console.log(`\n⚠️  Products Skipped (Validation Errors):`)
+      validationFailures.forEach(({ parentSKU, reasons }) => {
+        console.log(`   ✗ ${parentSKU}: ${reasons.join('; ')}`)
+      })
+    }
+    
+    if (importResults.errors && importResults.errors.length > 0) {
+      console.log(`\n❌ Products Failed During Import:`)
+      importResults.errors.forEach(({ parentSKU, error }) => {
+        console.log(`   ✗ ${parentSKU}: ${error}`)
+      })
+    }
+    
+    console.log(`${'='.repeat(60)}\n`)
+
     // 9. Trigger Algolia reindex for imported products
     try {
       const { syncAlgoliaWorkflow } = await import('@mercurjs/algolia/workflows')
@@ -220,7 +260,17 @@ export async function POST(
     // 10. Return results
     res.status(200).json({
       message: 'Import completed',
-      results: importResults
+      summary: {
+        total: groups.length,
+        imported: importResults.success,
+        failed: importResults.failed,
+        skipped: validationFailures.length
+      },
+      results: importResults,
+      validationFailures: validationFailures.map(f => ({
+        parentSKU: f.parentSKU,
+        reasons: f.reasons
+      }))
     })
   } catch (error: any) {
     console.error('[Vendor Product Import] Error:', error)

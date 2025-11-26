@@ -54,31 +54,38 @@ class AlgoliaModuleService {
     });
   }
 
-  batch(type: IndexType, toAdd: AlgoliaEntity[], toDelete: string[]) {
-    const requests: BatchRequest[] = toAdd.map((entity) => {
-      return {
-        action: "addObject" as Action,
-        objectID: entity.id,
-        body: entity,
-      };
-    });
+  async batch(type: IndexType, toAdd: AlgoliaEntity[], toDelete: string[]) {
+    try {
+      const requests: BatchRequest[] = toAdd.map((entity) => {
+        return {
+          action: "addObject" as Action,
+          objectID: entity.id,
+          body: entity,
+        };
+      });
 
-    requests.concat(
-      toDelete.map((id) => {
+      const deleteRequests = toDelete.map((id) => {
         return {
           action: "deleteObject" as Action,
           objectID: id,
           body: {},
         };
-      })
-    );
+      });
 
-    return this.algolia_.batch({
-      indexName: type,
-      batchWriteParams: {
-        requests,
-      },
-    });
+      const allRequests = [...requests, ...deleteRequests];
+
+      const result = await this.algolia_.batch({
+        indexName: type,
+        batchWriteParams: {
+          requests: allRequests,
+        },
+      });
+
+      return result;
+    } catch (error) {
+      console.error(`[Algolia Service] Batch error for index "${type}":`, error)
+      throw error;
+    }
   }
 
   batchUpsert(type: IndexType, entities: AlgoliaEntity[]) {

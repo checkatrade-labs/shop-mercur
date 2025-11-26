@@ -12,18 +12,36 @@ export default async function algoliaProductsChangedHandler({
   event,
   container,
 }: SubscriberArgs<{ ids: string[] }>) {
-  const algolia = container.resolve<AlgoliaModuleService>(ALGOLIA_MODULE);
+  try {
+    console.log(`[Algolia Subscriber] Processing ${event.data.ids.length} product(s)...`)
+    
+    const algolia = container.resolve<AlgoliaModuleService>(ALGOLIA_MODULE);
 
-  const { published, other } = await filterProductsByStatus(
-    container,
-    event.data.ids
-  );
+    const { published, other } = await filterProductsByStatus(
+      container,
+      event.data.ids
+    );
 
-  const productsToInsert = published.length
-    ? await findAndTransformAlgoliaProducts(container, published)
-    : [];
+    console.log(`[Algolia Subscriber] Published: ${published.length}, Other: ${other.length}`)
 
-  await algolia.batch(IndexType.PRODUCT, productsToInsert, other);
+    const productsToInsert = published.length
+      ? await findAndTransformAlgoliaProducts(container, published)
+      : [];
+
+    console.log(`[Algolia Subscriber] Transformed ${productsToInsert.length} products for indexing`)
+
+    await algolia.batch(IndexType.PRODUCT, productsToInsert, other);
+    
+    console.log(`[Algolia Subscriber] ✅ Successfully synced to Algolia`)
+  } catch (error) {
+    console.error(`[Algolia Subscriber] ❌ ERROR:`, error)
+    console.error(`[Algolia Subscriber] Error details:`, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    })
+    throw error
+  }
 }
 
 export const config: SubscriberConfig = {
