@@ -193,10 +193,10 @@ export async function createProductCategories(container: MedusaContainer) {
 
   // Check existing categories
   const existingCategories = await productModule.listProductCategories({}, { take: 9999 })
-  const existingByName = new Map(existingCategories.map((c: any) => [c.name, c]))
-  const existingByHandle = new Set(existingCategories.map((c: any) => c.handle))
+  let existingByName = new Map(existingCategories.map((c: any) => [c.name, c]))
+  let existingByHandle = new Set(existingCategories.map((c: any) => c.handle))
 
-  console.log(`Found ${existingCategories.length} existing categories`)
+  console.log(`Found ${existingByName.size} existing categories`)
 
   // Level 1: Create all top-level categories
   const level1ToCreate = Array.from(categoryHierarchy.keys()).filter(name => {
@@ -210,24 +210,38 @@ export async function createProductCategories(container: MedusaContainer) {
   })
   
   if (level1ToCreate.length > 0) {
-    const { result: level1Result } = await createProductCategoriesWorkflow(container).run({
-      input: {
-        product_categories: level1ToCreate.map(name => ({
-          name,
-          handle: toHandle(name),
-          is_active: true,
-          is_internal: false
-        }))
+    try {
+      const { result: level1Result } = await createProductCategoriesWorkflow(container).run({
+        input: {
+          product_categories: level1ToCreate.map(name => ({
+            name,
+            handle: toHandle(name),
+            is_active: true,
+            is_internal: false
+          }))
+        }
+      })
+      console.log(`✅ Created ${level1Result.length} level 1 categories`)
+      level1Result.forEach((c: any) => {
+        existingByName.set(c.name, c)
+        existingByHandle.add(c.handle)
+      })
+    } catch (error: any) {
+      // If categories already exist, skip them
+      if (error.message?.includes('already exists')) {
+        console.log(`⚠️  Some categories already exist, skipping duplicates`)
+      } else {
+        throw error
       }
-    })
-    console.log(`✅ Created ${level1Result.length} level 1 categories`)
-    level1Result.forEach((c: any) => {
-      existingByName.set(c.name, c)
-      existingByHandle.add(c.handle)
-    })
+    }
   } else {
     console.log(`ℹ️  All level 1 categories already exist`)
   }
+
+  // Refresh categories after level 1 to get latest state
+  const updatedCategories1 = await productModule.listProductCategories({}, { take: 9999 })
+  existingByName = new Map(updatedCategories1.map((c: any) => [c.name, c]))
+  existingByHandle = new Set(updatedCategories1.map((c: any) => c.handle))
 
   // Level 2: Create all subcategories
   const level2ToCreate: Array<{ name: string; parent: string }> = []
@@ -247,25 +261,39 @@ export async function createProductCategories(container: MedusaContainer) {
   }
 
   if (level2ToCreate.length > 0) {
-    const { result: level2Result } = await createProductCategoriesWorkflow(container).run({
-      input: {
-        product_categories: level2ToCreate.map(({ name, parent }) => ({
-          name,
-          handle: toHandle(name),
-          parent_category_id: parent,
-          is_active: true,
-          is_internal: false
-        }))
+    try {
+      const { result: level2Result } = await createProductCategoriesWorkflow(container).run({
+        input: {
+          product_categories: level2ToCreate.map(({ name, parent }) => ({
+            name,
+            handle: toHandle(name),
+            parent_category_id: parent,
+            is_active: true,
+            is_internal: false
+          }))
+        }
+      })
+      console.log(`✅ Created ${level2Result.length} level 2 categories`)
+      level2Result.forEach((c: any) => {
+        existingByName.set(c.name, c)
+        existingByHandle.add(c.handle)
+      })
+    } catch (error: any) {
+      // If categories already exist, skip them
+      if (error.message?.includes('already exists')) {
+        console.log(`⚠️  Some categories already exist, skipping duplicates`)
+      } else {
+        throw error
       }
-    })
-    console.log(`✅ Created ${level2Result.length} level 2 categories`)
-    level2Result.forEach((c: any) => {
-      existingByName.set(c.name, c)
-      existingByHandle.add(c.handle)
-    })
+    }
   } else {
     console.log(`ℹ️  All level 2 categories already exist`)
   }
+
+  // Refresh categories after level 2 to get latest state
+  const updatedCategories2 = await productModule.listProductCategories({}, { take: 9999 })
+  existingByName = new Map(updatedCategories2.map((c: any) => [c.name, c]))
+  existingByHandle = new Set(updatedCategories2.map((c: any) => c.handle))
 
   // Level 3: Create all product type categories
   const level3ToCreate: Array<{ name: string; parent: string }> = []
@@ -290,28 +318,50 @@ export async function createProductCategories(container: MedusaContainer) {
     // Create in batches to avoid overwhelming the system
     const batchSize = 50
     let totalCreated = 0
+    let totalSkipped = 0
     
     for (let i = 0; i < level3ToCreate.length; i += batchSize) {
       const batch = level3ToCreate.slice(i, i + batchSize)
-      const { result: level3Result } = await createProductCategoriesWorkflow(container).run({
-        input: {
-          product_categories: batch.map(({ name, parent }) => ({
-            name,
-            handle: toHandle(name),
-            parent_category_id: parent,
-            is_active: true,
-            is_internal: false
-          }))
+      try {
+        const { result: level3Result } = await createProductCategoriesWorkflow(container).run({
+          input: {
+            product_categories: batch.map(({ name, parent }) => ({
+              name,
+              handle: toHandle(name),
+              parent_category_id: parent,
+              is_active: true,
+              is_internal: false
+            }))
+          }
+        })
+        totalCreated += level3Result.length
+        level3Result.forEach((c: any) => {
+          existingByName.set(c.name, c)
+          existingByHandle.add(c.handle)
+        })
+        console.log(`   Created ${totalCreated}/${level3ToCreate.length} level 3 categories...`)
+      } catch (error: any) {
+        // If batch creation fails, skip the batch
+        if (error.message?.includes('already exists')) {
+          console.log(`   ⚠️  Some categories in batch already exist, skipping duplicates`)
+          totalSkipped += batch.length
+        } else {
+          console.log(`   ⚠️  Batch creation failed: ${error.message || 'Unknown error'}`)
+          totalSkipped += batch.length
         }
-      })
-      totalCreated += level3Result.length
-      level3Result.forEach((c: any) => {
-        existingByName.set(c.name, c)
-        existingByHandle.add(c.handle)
-      })
-      console.log(`   Created ${totalCreated}/${level3ToCreate.length} level 3 categories...`)
+        // Refresh maps after error to get latest state
+        const updatedBatch = await productModule.listProductCategories({}, { take: 9999 })
+        existingByName = new Map(updatedBatch.map((c: any) => [c.name, c]))
+        existingByHandle = new Set(updatedBatch.map((c: any) => c.handle))
+        console.log(`   Progress: ${totalCreated + totalSkipped}/${level3ToCreate.length} level 3 categories processed...`)
+      }
     }
-    console.log(`✅ Created ${totalCreated} level 3 categories`)
+    if (totalCreated > 0) {
+      console.log(`✅ Created ${totalCreated} level 3 categories`)
+    }
+    if (totalSkipped > 0) {
+      console.log(`ℹ️  Skipped ${totalSkipped} level 3 categories (already exist)`)
+    }
   } else {
     console.log(`ℹ️  All level 3 categories already exist`)
   }

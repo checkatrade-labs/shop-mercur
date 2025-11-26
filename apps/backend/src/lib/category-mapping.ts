@@ -35,6 +35,7 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'LIMES': { level1: 'Building Materials', level2: 'Cement & Aggregates', level3: 'Limes' },
   'READY_MIXED_CONCRETES_&_MORTAR': { level1: 'Building Materials', level2: 'Cement & Aggregates', level3: 'Ready Mixed Concretes & Mortar' },
   'SCREEDING_&_FLOOR_LEVELLING_COMPOUND': { level1: 'Building Materials', level2: 'Cement & Aggregates', level3: 'Screeding & Floor Levelling Compound' },
+  'AGGREGATES': { level1: 'Building Materials', level2: 'Cement & Aggregates', level3: 'Aggregates' },
 
   // Building Materials → Plasterboard & Drylining
   'PLASTERBOARD': { level1: 'Building Materials', level2: 'Plasterboard & Drylining', level3: 'Plasterboard' },
@@ -86,6 +87,8 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'STEEL_LINTELS': { level1: 'Building Materials', level2: 'Bricks & Lintels', level3: 'Steel Lintels' },
   'PADSTONES': { level1: 'Building Materials', level2: 'Bricks & Lintels', level3: 'Padstones' },
   'BLOCK_&_BEAM_FLOORING': { level1: 'Building Materials', level2: 'Bricks & Lintels', level3: 'Block & Beam Flooring' },
+  'BRICKWORK_ACCESORIES': { level1: 'Building Materials', level2: 'Bricks & Lintels', level3: 'Brickwork Accessories' },
+  'BRICKWORK_ACCESSORIES': { level1: 'Building Materials', level2: 'Bricks & Lintels', level3: 'Brickwork Accessories' }, // Correct spelling alias
 
   // Building Materials → Building Supplies
   'BUILDERS\'_METALWORK': { level1: 'Building Materials', level2: 'Building Supplies', level3: 'Builders\' Metalwork' },
@@ -136,6 +139,23 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   // Gardens and Landscaping → Garden Supplies
   'PLANT_SEED': { level1: 'Gardens and Landscaping', level2: 'Garden Supplies', level3: 'Plant Seed' },
   'ANCHOR_STAKE': { level1: 'Gardens and Landscaping', level2: 'Garden Supplies', level3: 'Anchor Stake' },
+  'GARDEN_&_RAILWAY_SLEEPERS': { level1: 'Gardens and Landscaping', level2: 'Garden Supplies', level3: 'Garden & Railway Sleepers' },
+  'DECORATIVE_STONES_&_GRAVEL': { level1: 'Gardens and Landscaping', level2: 'Garden Supplies', level3: 'Decorative Stones & Gravel' },
+  'WEED_MEMBRANES': { level1: 'Gardens and Landscaping', level2: 'Garden Supplies', level3: 'Weed Membranes' },
+
+  // Gardens and Landscaping → Fencing
+  'FENCE_POSTS': { level1: 'Gardens and Landscaping', level2: 'Fencing', level3: 'Fence Posts' },
+  'FENCE_PANELS': { level1: 'Gardens and Landscaping', level2: 'Fencing', level3: 'Fence Panels' },
+  'FENCE_BOARDS': { level1: 'Gardens and Landscaping', level2: 'Fencing', level3: 'Fence Boards' },
+  'FENCING_ACCESSORIES': { level1: 'Gardens and Landscaping', level2: 'Fencing', level3: 'Fencing Accessories' },
+  'TRELLIS_PANELS_&_SCREENING': { level1: 'Gardens and Landscaping', level2: 'Fencing', level3: 'Trellis Panels & Screening' },
+
+  // Gardens and Landscaping → Decking
+  'DECKING_BOARDS': { level1: 'Gardens and Landscaping', level2: 'Decking', level3: 'Decking Boards' },
+
+  // Gardens and Landscaping → Driveways & Paving
+  'PATH_&_LAWN_EDGING': { level1: 'Gardens and Landscaping', level2: 'Driveways & Paving', level3: 'Path & Lawn Edging' },
+  'PAVING_&_WALLING': { level1: 'Gardens and Landscaping', level2: 'Driveways & Paving', level3: 'Paving & Walling' },
 
   // Doors and Windows → Internal Doors
   'FIRE_RATED_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Fire Rated Doors' },

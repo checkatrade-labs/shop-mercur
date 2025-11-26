@@ -144,10 +144,16 @@ export async function findAndTransformAlgoliaProducts(
       'variants.title',
       'variants.sku',
       'variants.metadata',
+      'variants.allow_backorder',
+      'variants.manage_inventory',
+      'variants.options.id',
+      'variants.options.option.id',
       'variants.options.option.title',
       'variants.options.value',
+      'variants.prices.id',
       'variants.prices.amount',
       'variants.prices.currency_code',
+      'variants.prices.rules_count',
       'options.id',
       'options.title',
       'options.values.value',
@@ -188,8 +194,44 @@ export async function findAndTransformAlgoliaProducts(
       })
       .flat();
     
+    // Add default values for optional fields that might be missing
+    // This ensures compatibility with the Zod validator and handles cases where
+    // fields might be null/undefined even if they were set during import
+    const variantsWithDefaults = product.variants?.map((variant: any) => {
+      const variantWithDefaults: any = {
+        ...variant,
+        // Ensure boolean fields have default values
+        allow_backorder: variant.allow_backorder ?? false,
+        manage_inventory: variant.manage_inventory ?? false,
+        // Ensure options structure is complete (handle null option gracefully)
+        options: variant.options?.map((opt: any) => {
+          if (!opt.option) {
+            return {
+              id: opt.id ?? undefined,
+              value: opt.value ?? '',
+              option: null,
+            };
+          }
+          return {
+            id: opt.id ?? undefined,
+            value: opt.value ?? '',
+            option: {
+              id: opt.option.id ?? undefined,
+              title: opt.option.title ?? '',
+            },
+          };
+        }) ?? [],
+        // Ensure prices have rules_count (default to 0 if missing)
+        prices: variant.prices?.map((price: any) => ({
+          ...price,
+          rules_count: price.rules_count ?? 0,
+        })) ?? [],
+      };
+      return variantWithDefaults;
+    }) ?? [];
+    
     // Validate and transform variants
-    product.variants = z.array(AlgoliaVariantValidator).parse(product.variants);
+    product.variants = z.array(AlgoliaVariantValidator).parse(variantsWithDefaults);
     
     // Limit to first 20 variants to avoid record size issues
     const variantsToIndex = product.variants.slice(0, 20);

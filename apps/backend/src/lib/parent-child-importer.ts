@@ -39,27 +39,34 @@ export async function importParentGroup(
   productId?: string
   error?: string
 }> {
-  try {
-    const { parentRow, childRows, parentSKU } = group
-    const { sellerId, stockLocationId, salesChannelId, regionId } = context
+  const { parentRow, childRows, parentSKU } = group
+  const { sellerId, stockLocationId, salesChannelId, regionId } = context
 
+  console.log(`\n🔍 [DEBUG] Starting import for product: ${parentSKU}`)
+  
+  try {
     // 1. Get Product Module
     const productModule = scope.resolve(Modules.PRODUCT)
+    console.log(`   [DEBUG ${parentSKU}] ✓ Product module resolved`)
 
     // 2. Determine product name and description
     const productTitle = parentRow['Item Name'] || parentRow['Title'] || `Product ${parentSKU}`
     const productDescription = parentRow['Product Description'] || ''
+    console.log(`   [DEBUG ${parentSKU}] Product title: "${productTitle}"`)
 
     // 3. Get category mapping for this product type
     const productType = parentRow['Product Type']
+    console.log(`   [DEBUG ${parentSKU}] Product type: "${productType}"`)
     const categoryMapping = getCategoryForProductType(productType)
 
     if (!categoryMapping) {
+      console.error(`   [DEBUG ${parentSKU}] ❌ No category mapping found for product type: "${productType}"`)
       return {
         success: false,
         error: `No category mapping for product type: ${productType}`
       }
     }
+    console.log(`   [DEBUG ${parentSKU}] ✓ Category mapping found: ${categoryMapping.level1} > ${categoryMapping.level2} > ${categoryMapping.level3}`)
 
     // 4. Find the leaf category (level 3)
     const categories = await productModule.listProductCategories({
@@ -67,6 +74,7 @@ export async function importParentGroup(
     })
 
     if (!categories || categories.length === 0) {
+      console.error(`   [DEBUG ${parentSKU}] ❌ Category not found: "${categoryMapping.level3}"`)
       return {
         success: false,
         error: `Category not found: ${categoryMapping.level3}`
@@ -74,6 +82,7 @@ export async function importParentGroup(
     }
 
     const leafCategory = categories[0]
+    console.log(`   [DEBUG ${parentSKU}] ✓ Category found: "${leafCategory.name}" (ID: ${leafCategory.id})`)
 
     // 4b. Find product type ID
     let productTypeId: string | undefined
@@ -83,6 +92,9 @@ export async function importParentGroup(
       })
       if (productTypes && productTypes.length > 0) {
         productTypeId = productTypes[0].id
+        console.log(`   [DEBUG ${parentSKU}] ✓ Product type ID found: ${productTypeId}`)
+      } else {
+        console.log(`   [DEBUG ${parentSKU}] ⚠️  Product type "${productType}" not found in database, continuing without type ID`)
       }
     }
 
@@ -114,6 +126,11 @@ export async function importParentGroup(
 
     // Extract unit count type from parent row or first child row
     const unitCountType = parentRow['Unit Count Type'] || childRows[0]?.['Unit Count Type'] || ''
+    
+    console.log(`   [DEBUG ${parentSKU}] Variation theme: "${variationTheme}"`)
+    console.log(`   [DEBUG ${parentSKU}] Variation flags: Color=${useColor}, Size=${useSize}, Style=${useStyle}, Quantity=${useQuantity}`)
+    console.log(`   [DEBUG ${parentSKU}] Found ${childRows.length} child rows (variants)`)
+    console.log(`   [DEBUG ${parentSKU}] Unique values: Colors=${colors.size}, Sizes=${sizes.size}, Styles=${styles.size}, Quantities=${quantities.size}`)
 
     // 8. Create variants from child rows
     const variants = childRows.map((childRow, index) => {
@@ -163,12 +180,16 @@ export async function importParentGroup(
       return {
         title: variantTitle,
         sku,
+        // Explicitly set these fields to avoid Algolia validation errors
         manage_inventory: true,
         allow_backorder: false,
         prices: [
           {
             amount: price,
-            currency_code: 'gbp'
+            currency_code: 'gbp',
+            rules_count: 0, // Required for Algolia validation
+            min_quantity: null,
+            max_quantity: null,
           }
         ],
         options,
@@ -177,11 +198,15 @@ export async function importParentGroup(
     })
 
     if (variants.length === 0) {
+      console.error(`   [DEBUG ${parentSKU}] ❌ No variants created from ${childRows.length} child rows`)
       return {
         success: false,
         error: 'No variants to create'
       }
     }
+    
+    console.log(`   [DEBUG ${parentSKU}] ✓ Created ${variants.length} variants`)
+    console.log(`   [DEBUG ${parentSKU}] Sample variant: SKU=${variants[0].sku}, Price=${variants[0].prices[0]?.amount}, Options=${JSON.stringify(variants[0].options)}`)
 
     // 7. Generate readable handle from product title
     const generateHandle = (title: string, sku: string): string => {
@@ -245,30 +270,49 @@ export async function importParentGroup(
     }
 
     // 9. Create product with variants using workflow
-    const { result } = await createProductsWorkflow(scope).run({
-      input: {
-        products: [
-          {
-            title: productTitle,
-            description: productDescription,
-            status: 'published',
-            is_giftcard: false,
-            discountable: true,
-            handle,
-            images,
-            category_ids: [leafCategory.id],
-            type_id: productTypeId, // Add product type ID
-            options: productOptions,
-            variants,
-            metadata: extractProductMetadata(parentRow, parentSKU, sellerId),
-            sales_channels: [{ id: salesChannelId }]
-          }
-        ]
-      }
-    })
+    console.log(`   [DEBUG ${parentSKU}] Creating product with ${variants.length} variants, ${productOptions.length} options`)
+    console.log(`   [DEBUG ${parentSKU}] Handle: "${handle}", Category ID: ${leafCategory.id}, Type ID: ${productTypeId || 'none'}`)
+    
+    let product: any
+    let productId: string
+    
+    try {
+      const { result } = await createProductsWorkflow(scope).run({
+        input: {
+          products: [
+            {
+              title: productTitle,
+              description: productDescription,
+              status: 'published',
+              is_giftcard: false,
+              discountable: true,
+              handle,
+              images,
+              category_ids: [leafCategory.id],
+              type_id: productTypeId, // Add product type ID
+              options: productOptions,
+              variants,
+              metadata: extractProductMetadata(parentRow, parentSKU, sellerId),
+              sales_channels: [{ id: salesChannelId }]
+            }
+          ]
+        }
+      })
 
-    const product = result[0]
-    const productId = product.id
+      if (!result || !result[0]) {
+        console.error(`   [DEBUG ${parentSKU}] ❌ Product creation returned empty result`)
+        throw new Error('Product creation returned empty result')
+      }
+
+      product = result[0]
+      productId = product.id
+      console.log(`   [DEBUG ${parentSKU}] ✓ Product created successfully: ${productId}`)
+    } catch (workflowError: any) {
+      console.error(`   [DEBUG ${parentSKU}] ❌ Product creation workflow failed:`)
+      console.error(`   [DEBUG ${parentSKU}]    Error: ${workflowError.message}`)
+      console.error(`   [DEBUG ${parentSKU}]    Stack: ${workflowError.stack}`)
+      throw workflowError
+    }
 
     // 8. Link product to seller (using direct DB insert into join table)
     try {
@@ -375,14 +419,21 @@ export async function importParentGroup(
       }
     }
 
+    console.log(`   [DEBUG ${parentSKU}] ✓ Product import completed successfully`)
     return {
       success: true,
       productId
     }
   } catch (error: any) {
+    console.error(`   [DEBUG ${parentSKU}] ❌ Import failed with error:`)
+    console.error(`   [DEBUG ${parentSKU}]    Message: ${error.message || 'Unknown error'}`)
+    console.error(`   [DEBUG ${parentSKU}]    Stack: ${error.stack || 'No stack trace'}`)
+    if (error.cause) {
+      console.error(`   [DEBUG ${parentSKU}]    Cause: ${error.cause}`)
+    }
     return {
       success: false,
-      error: error.message
+      error: error.message || 'Unknown error'
     }
   }
 }
@@ -407,17 +458,23 @@ export async function importParentGroups(
     errors: [] as Array<{ parentSKU: string; error: string }>
   }
 
-  for (const group of groups) {
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i]
+    console.log(`\n📦 [Import Progress] Processing product ${i + 1}/${groups.length}: ${group.parentSKU}`)
+    
     const result = await importParentGroup(group, context, scope)
 
     if (result.success) {
       results.success++
+      console.log(`   ✅ [Import Progress] Successfully imported ${group.parentSKU} → ${result.productId}`)
     } else {
       results.failed++
+      const errorMsg = result.error || 'Unknown error'
       results.errors.push({
         parentSKU: group.parentSKU,
-        error: result.error || 'Unknown error'
+        error: errorMsg
       })
+      console.error(`   ❌ [Import Progress] Failed to import ${group.parentSKU}: ${errorMsg}`)
     }
   }
 
