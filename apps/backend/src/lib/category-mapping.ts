@@ -97,41 +97,43 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'FASCIAS_&_SOFFITS': { level1: 'Building Materials', level2: 'Building Supplies', level3: 'Fascias & Soffits' },
   'RAW_MATERIALS': { level1: 'Building Materials', level2: 'Building Supplies', level3: 'Raw Materials' },
 
-  // Flooring and Tiling → Flooring Tools & Accessories
-  'RUG_PAD': { level1: 'Flooring and Tiling', level2: 'Flooring Tools & Accessories', level3: 'Rug Pad' },
-  'TEXTILE_DEODORIZER': { level1: 'Flooring and Tiling', level2: 'Flooring Tools & Accessories', level3: 'Textile Deodorizer' },
-  'WEATHER_STRIPPING': { level1: 'Flooring and Tiling', level2: 'Flooring Tools & Accessories', level3: 'Weather Stripping' },
+  // Flooring & Tiling → Flooring Tools & Accessories
+  'RUG_PAD': { level1: 'Flooring & Tiling', level2: 'Flooring Tools & Accessories', level3: 'Rug Pad' },
+  'TEXTILE_DEODORIZER': { level1: 'Flooring & Tiling', level2: 'Flooring Tools & Accessories', level3: 'Textile Deodorizer' },
+  'WEATHER_STRIPPING': { level1: 'Flooring & Tiling', level2: 'Flooring Tools & Accessories', level3: 'Weather Stripping' },
 
-  // Flooring and Tiling → Vinyl
-  'VINYL': { level1: 'Flooring and Tiling', level2: 'Vinyl', level3: 'Vinyl' },
+  // Flooring & Tiling → Vinyl
+  'VINYL': { level1: 'Flooring & Tiling', level2: 'Vinyl', level3: 'Vinyl' },
 
-  // Flooring and Tiling → Carpet
-  'CARPETING': { level1: 'Flooring and Tiling', level2: 'Carpet', level3: 'Carpeting' },
+  // Flooring & Tiling → Carpet
+  'CARPETING': { level1: 'Flooring & Tiling', level2: 'Carpet', level3: 'Carpeting' },
 
-  // Flooring and Tiling → Rugs
-  'RUG': { level1: 'Flooring and Tiling', level2: 'Rugs', level3: 'Rug' },
+  // Flooring & Tiling → Rugs
+  'RUG': { level1: 'Flooring & Tiling', level2: 'Rugs', level3: 'Rug' },
 
-  // Flooring and Tiling → Stair Runner
-  'STAIR_RUNNER': { level1: 'Flooring and Tiling', level2: 'Stair Runner', level3: 'Stair Runner' },
+  // Flooring & Tiling → Stair Runner
+  'STAIR_RUNNER': { level1: 'Flooring & Tiling', level2: 'Stair Runner', level3: 'Stair Runner' },
 
-  // Flooring and Tiling → Laminate
-  'LAMINATE': { level1: 'Flooring and Tiling', level2: 'Laminate', level3: 'Laminate' },
+  // Flooring & Tiling → Laminate
+  'LAMINATE': { level1: 'Flooring & Tiling', level2: 'Laminate', level3: 'Laminate' },
 
-  // Flooring and Tiling → LVT
-  'LVT': { level1: 'Flooring and Tiling', level2: 'LVT', level3: 'LVT' },
+  // Flooring & Tiling → LVT
+  'LVT': { level1: 'Flooring & Tiling', level2: 'LVT', level3: 'LVT' },
 
-  // Flooring and Tiling → Engineered Wood
-  'ENGINEERED_WOOD': { level1: 'Flooring and Tiling', level2: 'Engineered Wood', level3: 'Engineered Wood' },
+  // Flooring & Tiling → Engineered Wood
+  'ENGINEERED_WOOD': { level1: 'Flooring & Tiling', level2: 'Engineered Wood', level3: 'Engineered Wood' },
 
-  // Flooring and Tiling → Tiles
-  'TILE': { level1: 'Flooring and Tiling', level2: 'Tiles', level3: 'Tile' },
+  // Flooring & Tiling → Tiles
+  'TILE': { level1: 'Flooring & Tiling', level2: 'Tiles', level3: 'Tile' },
 
-  // Renewable and Energy → EV Charger
-  'EV_CHARGER': { level1: 'Renewable and Energy', level2: 'EV Charger', level3: 'EV Charger' },
+  // Renewable & Energy → EV Charger
+  'EV_CHARGER': { level1: 'Renewable & Energy', level2: 'EV Charger', level3: 'EV Charger' },
 
-  // Renewable and Energy → Solar
-  'SOLAR_PANELS': { level1: 'Renewable and Energy', level2: 'Solar', level3: 'Solar Panels' },
-  'BATTERY_STORAGE': { level1: 'Renewable and Energy', level2: 'Solar', level3: 'Battery Storage' },
+  // Renewable & Energy → Solar
+  'SOLAR_PANELS': { level1: 'Renewable & Energy', level2: 'Solar', level3: 'Solar Panels' },
+  
+  // Renewable & Energy → Solar Battery
+  'BATTERY_STORAGE': { level1: 'Renewable & Energy', level2: 'Solar Battery', level3: 'Battery Storage' },
 
   // Heating and Plumbing → Boilers
   'BOILERS': { level1: 'Heating and Plumbing', level2: 'Boilers', level3: 'Boilers' },

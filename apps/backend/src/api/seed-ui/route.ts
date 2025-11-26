@@ -170,6 +170,82 @@ export async function GET(
       margin: 4px;
     }
     
+    .tree-container {
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      padding: 16px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    
+    .tree-item {
+      margin-bottom: 8px;
+    }
+    
+    .tree-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    
+    .tree-item:hover .tree-content {
+      background: #f7fafc;
+    }
+    
+    .tree-item.level1 .tree-content {
+      font-weight: 600;
+      color: #1a202c;
+      border-left: 3px solid #667eea;
+      padding-left: 12px;
+    }
+    
+    .tree-item.level2 .tree-content {
+      font-weight: 500;
+      color: #2d3748;
+      border-left: 3px solid #48bb78;
+      padding-left: 12px;
+    }
+    
+    .tree-item.level3 .tree-content {
+      font-weight: 400;
+      color: #4a5568;
+      border-left: 3px solid #ed8936;
+      padding-left: 12px;
+    }
+    
+    .tree-icon {
+      font-size: 16px;
+    }
+    
+    .tree-name {
+      flex: 1;
+      font-size: 14px;
+    }
+    
+    .tree-handle {
+      font-size: 12px;
+      color: #718096;
+      font-family: monospace;
+    }
+    
+    .tree-count {
+      font-size: 11px;
+      color: #667eea;
+      background: #ebf8ff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+    
+    .tree-children {
+      margin-top: 4px;
+      margin-left: 24px;
+    }
+    
     button {
       background: #667eea;
       color: white;
@@ -237,10 +313,52 @@ export async function GET(
         
         const data = await response.json();
         
+        // Debug: log the data structure
+        console.log('Seed response data:', data);
+        console.log('Category tree:', data.data?.categoryTree);
+        if (data.data?.categoryTree && data.data.categoryTree.length > 0) {
+          console.log('First category in tree:', data.data.categoryTree[0]);
+        }
+        
         // Show success state
         statusEl.className = 'status success';
         statusEl.innerHTML = '<span>✅ Seeding completed successfully!</span>';
         
+        // Build category tree HTML
+        const renderCategoryTree = (categories, level = 0) => {
+          if (!categories || categories.length === 0) {
+            console.warn('No categories to render at level', level);
+            return '<div class="tree-item">No categories found</div>';
+          }
+          return categories.map((cat, index) => {
+            if (!cat) {
+              console.warn('Null category at index', index, 'level', level);
+              return '';
+            }
+            const indent = level * 20;
+            const levelClass = level === 0 ? 'level1' : level === 1 ? 'level2' : 'level3';
+            const catName = cat.name || 'Unnamed Category';
+            const catHandle = cat.handle || 'no-handle';
+            return \`
+              <div class="tree-item \${levelClass}" style="padding-left: \${indent}px;">
+                <div class="tree-content">
+                  <span class="tree-icon">\${level === 0 ? '📁' : level === 1 ? '📂' : '📄'}</span>
+                  <span class="tree-name">\${catName}</span>
+                  <span class="tree-handle">(\${catHandle})</span>
+                  \${cat.children && cat.children.length > 0 ? \`
+                    <span class="tree-count">\${cat.children.length} subcategories</span>
+                  \` : ''}
+                </div>
+                \${cat.children && cat.children.length > 0 ? \`
+                  <div class="tree-children">
+                    \${renderCategoryTree(cat.children, level + 1)}
+                  </div>
+                \` : ''}
+              </div>
+            \`;
+          }).join('');
+        };
+
         // Show results
         resultsEl.style.display = 'block';
         resultsEl.innerHTML = \`
@@ -255,19 +373,9 @@ export async function GET(
             </div>
           </div>
           
-          <h3 style="margin-bottom: 12px; color: #1a202c;">Categories</h3>
-          <div class="list">
-            \${data.data.categories.slice(0, 20).map(cat => \`
-              <div class="list-item">
-                <div class="list-title">\${cat.name}</div>
-                <div class="list-subtitle">\${cat.handle}</div>
-              </div>
-            \`).join('')}
-            \${data.data.categories.length > 20 ? \`
-              <div class="list-item" style="text-align: center; color: #718096;">
-                ... and \${data.data.categories.length - 20} more
-              </div>
-            \` : ''}
+          <h3 style="margin: 24px 0 12px; color: #1a202c;">Category Hierarchy</h3>
+          <div class="tree-container">
+            \${renderCategoryTree(data.data.categoryTree || [])}
           </div>
           
           <h3 style="margin: 24px 0 12px; color: #1a202c;">Product Types</h3>

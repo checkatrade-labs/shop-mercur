@@ -198,16 +198,20 @@ export async function findAndTransformAlgoliaProducts(
     // This ensures compatibility with the Zod validator and handles cases where
     // fields might be null/undefined even if they were set during import
     const variantsWithDefaults = product.variants?.map((variant: any) => {
-      // Filter out options with null option (they're not useful for Algolia anyway)
-      const validOptions = variant.options?.filter((opt: any) => opt.option !== null && opt.option !== undefined) || [];
-      
       const variantWithDefaults: any = {
         ...variant,
         // Ensure boolean fields have default values
         allow_backorder: variant.allow_backorder ?? false,
         manage_inventory: variant.manage_inventory ?? false,
-        // Ensure options structure is complete (only include options with valid option objects)
-        options: validOptions.map((opt: any) => {
+        // Ensure options structure is complete (handle null option gracefully)
+        options: variant.options?.map((opt: any) => {
+          if (!opt.option) {
+            return {
+              id: opt.id ?? undefined,
+              value: opt.value ?? '',
+              option: null,
+            };
+          }
           return {
             id: opt.id ?? undefined,
             value: opt.value ?? '',
@@ -216,7 +220,7 @@ export async function findAndTransformAlgoliaProducts(
               title: opt.option.title ?? '',
             },
           };
-        }),
+        }) ?? [],
         // Ensure prices have rules_count (default to 0 if missing)
         prices: variant.prices?.map((price: any) => ({
           ...price,
@@ -227,25 +231,7 @@ export async function findAndTransformAlgoliaProducts(
     }) ?? [];
     
     // Validate and transform variants
-    // Use safeParse to handle validation errors gracefully (for staging compatibility)
-    const validationResult = z.array(AlgoliaVariantValidator).safeParse(variantsWithDefaults);
-    
-    if (!validationResult.success) {
-      console.error(`[Algolia] Variant validation failed for product ${product.id}:`, validationResult.error.errors);
-      // Filter out invalid variants and continue with valid ones
-      // This prevents the entire sync from failing due to a few bad variants
-      const validVariants = variantsWithDefaults.filter((variant: any, index: number) => {
-        const variantValidation = AlgoliaVariantValidator.safeParse(variant);
-        if (!variantValidation.success) {
-          console.warn(`[Algolia] Skipping invalid variant ${variant.id || index}:`, variantValidation.error.errors);
-          return false;
-        }
-        return true;
-      });
-      product.variants = validVariants;
-    } else {
-      product.variants = validationResult.data;
-    }
+    product.variants = z.array(AlgoliaVariantValidator).parse(variantsWithDefaults);
     
     // Limit to first 20 variants to avoid record size issues
     const variantsToIndex = product.variants.slice(0, 20);

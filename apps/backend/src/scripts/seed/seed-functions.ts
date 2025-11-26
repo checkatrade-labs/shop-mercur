@@ -96,7 +96,6 @@ export async function createRegions(container: MedusaContainer) {
   // Check if region already exists
   const existingRegions = await regionService.listRegions({ name: 'United Kingdom' })
   if (existingRegions && existingRegions.length > 0) {
-    console.log('Region "United Kingdom" already exists, skipping creation')
     return existingRegions[0]
   }
 
@@ -168,6 +167,7 @@ export async function createPublishableKey(
 
 export async function createProductCategories(container: MedusaContainer) {
   const productModule = container.resolve(Modules.PRODUCT)
+  const query = container.resolve(ContainerRegistrationKeys.QUERY)
   
   // Build category hierarchy from mapping
   const categoryHierarchy = new Map<string, Set<string>>() // level1 -> level2[]
@@ -191,23 +191,47 @@ export async function createProductCategories(container: MedusaContainer) {
   // Helper to generate handle
   const toHandle = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  // Check existing categories
-  const existingCategories = await productModule.listProductCategories({}, { take: 9999 })
-  let existingByName = new Map(existingCategories.map((c: any) => [c.name, c]))
-  let existingByHandle = new Set(existingCategories.map((c: any) => c.handle))
+  // Helper to fetch categories with proper fields using query.graph
+  const fetchCategoriesWithFields = async () => {
+    const { data } = await query.graph({
+      entity: 'product_category',
+      fields: ['id', 'name', 'handle', 'parent_category_id'],
+      filters: {},
+      pagination: { take: 9999 }
+    })
+    return data
+  }
 
-  console.log(`Found ${existingByName.size} existing categories`)
+  // Check existing categories using query.graph to get proper fields
+  const existingCategories = await fetchCategoriesWithFields()
+  let existingByName = new Map(existingCategories.filter((c: any) => c && c.name).map((c: any) => [c.name, c]))
+  let existingByHandle = new Map(existingCategories.filter((c: any) => c && c.handle).map((c: any) => [c.handle, c]))
 
   // Level 1: Create all top-level categories
-  const level1ToCreate = Array.from(categoryHierarchy.keys()).filter(name => {
-    const hasName = existingByName.has(name)
+  const level1ToCreate: string[] = []
+  const level1Skipped: string[] = []
+  
+  for (const name of categoryHierarchy.keys()) {
     const handle = toHandle(name)
+    const hasName = existingByName.has(name)
     const hasHandle = existingByHandle.has(handle)
-    if (hasName || hasHandle) {
-      console.log(`   ℹ️  Skipping "${name}" (handle: ${handle}, hasName: ${hasName}, hasHandle: ${hasHandle})`)
+    
+    if (hasName) {
+      level1Skipped.push(name)
+      // Ensure it's in the map (should already be, but just in case)
+      if (!existingByName.has(name)) {
+        existingByName.set(name, existingByName.get(name)!)
+      }
+    } else if (hasHandle) {
+      // Category exists by handle but different name - use the existing one
+      const existingCat = existingByHandle.get(handle)!
+      // Map the expected name to the existing category so lookups work
+      existingByName.set(name, existingCat)
+      level1Skipped.push(name)
+    } else {
+      level1ToCreate.push(name)
     }
-    return !hasName && !hasHandle
-  })
+  }
   
   if (level1ToCreate.length > 0) {
     try {
@@ -224,33 +248,113 @@ export async function createProductCategories(container: MedusaContainer) {
       console.log(`✅ Created ${level1Result.length} level 1 categories`)
       level1Result.forEach((c: any) => {
         existingByName.set(c.name, c)
-        existingByHandle.add(c.handle)
+        existingByHandle.set(c.handle, c)
       })
     } catch (error: any) {
-      // If categories already exist, skip them
+      // If categories already exist, refresh and continue
       if (error.message?.includes('already exists')) {
-        console.log(`⚠️  Some categories already exist, skipping duplicates`)
+        const refreshed = await fetchCategoriesWithFields()
+        refreshed.forEach((c: any) => {
+          if (c && c.name) {
+            existingByName.set(c.name, c)
+          }
+          if (c && c.handle) {
+            existingByHandle.set(c.handle, c)
+          }
+        })
+        // Also try to map by handle for any that might have been created
+        for (const name of level1ToCreate) {
+          const handle = toHandle(name)
+          const existingByHandleCat = refreshed.find((c: any) => c.handle === handle)
+          if (existingByHandleCat && !existingByName.has(name)) {
+            existingByName.set(name, existingByHandleCat)
+          }
+        }
+        // Also map all expected level 1 names to existing categories by handle
+        for (const expectedName of categoryHierarchy.keys()) {
+          if (!existingByName.has(expectedName)) {
+            const handle = toHandle(expectedName)
+            const byHandle = existingByHandle.get(handle)
+            if (byHandle) {
+              existingByName.set(expectedName, byHandle)
+            } else {
+              // Try case-insensitive search
+              const found = refreshed.find((c: any) => {
+                if (!c || !c.name) return false
+                return c.name.toLowerCase() === expectedName.toLowerCase() ||
+                  c.name.toLowerCase().replace(/&/g, 'and') === expectedName.toLowerCase().replace(/&/g, 'and')
+              })
+              if (found) {
+                existingByName.set(expectedName, found)
+              } else {
+                console.warn(`⚠️  Could not find category "${expectedName}" (handle: ${handle}) in database`)
+              }
+            }
+          }
+        }
       } else {
         throw error
       }
     }
-  } else {
-    console.log(`ℹ️  All level 1 categories already exist`)
   }
 
   // Refresh categories after level 1 to get latest state
-  const updatedCategories1 = await productModule.listProductCategories({}, { take: 9999 })
-  existingByName = new Map(updatedCategories1.map((c: any) => [c.name, c]))
-  existingByHandle = new Set(updatedCategories1.map((c: any) => c.handle))
+  const updatedCategories1 = await fetchCategoriesWithFields()
+  existingByName = new Map(updatedCategories1.filter((c: any) => c && c.name).map((c: any) => [c.name, c]))
+  existingByHandle = new Map(updatedCategories1.filter((c: any) => c && c.handle).map((c: any) => [c.handle, c]))
+  
+  // Also create a reverse lookup: for each expected level1 name, find the actual category
+  // This handles cases where category names might have slight variations
+  for (const expectedName of categoryHierarchy.keys()) {
+    if (!existingByName.has(expectedName)) {
+      // Try to find by handle
+      const handle = toHandle(expectedName)
+      const byHandle = existingByHandle.get(handle)
+      if (byHandle) {
+        existingByName.set(expectedName, byHandle)
+      } else {
+        // Try case-insensitive search
+        const found = updatedCategories1.find((c: any) => {
+          if (!c || !c.name) return false
+          return c.name.toLowerCase() === expectedName.toLowerCase() ||
+            c.name.toLowerCase().replace(/&/g, 'and') === expectedName.toLowerCase().replace(/&/g, 'and')
+        })
+        if (found) {
+          existingByName.set(expectedName, found)
+        } else {
+          console.warn(`⚠️  Could not find category "${expectedName}" (handle: ${handle}) in database`)
+        }
+      }
+    }
+  }
 
   // Level 2: Create all subcategories
   const level2ToCreate: Array<{ name: string; parent: string }> = []
   
   for (const [level1Name, level2Names] of categoryHierarchy.entries()) {
-    const parentCategory = existingByName.get(level1Name)
+    let parentCategory = existingByName.get(level1Name)
     if (!parentCategory) {
-      console.warn(`⚠️  Parent category "${level1Name}" not found, skipping subcategories`)
-      continue
+      // Try to find by handle
+      const handle = toHandle(level1Name)
+      const byHandle = existingByHandle.get(handle)
+      if (byHandle) {
+        parentCategory = byHandle
+        existingByName.set(level1Name, byHandle)
+      } else {
+        // Try case-insensitive search
+        const found = Array.from(existingByName.values()).find((c: any) => {
+          if (!c || !c.name) return false
+          return c.name.toLowerCase() === level1Name.toLowerCase() ||
+            c.name.toLowerCase().replace(/&/g, 'and') === level1Name.toLowerCase().replace(/&/g, 'and')
+        })
+        if (found) {
+          parentCategory = found
+          existingByName.set(level1Name, found)
+        } else {
+          console.warn(`⚠️  Parent category "${level1Name}" not found, skipping subcategories`)
+          continue
+        }
+      }
     }
     
     for (const level2Name of level2Names) {
@@ -276,35 +380,65 @@ export async function createProductCategories(container: MedusaContainer) {
       console.log(`✅ Created ${level2Result.length} level 2 categories`)
       level2Result.forEach((c: any) => {
         existingByName.set(c.name, c)
-        existingByHandle.add(c.handle)
+        existingByHandle.set(c.handle, c)
       })
     } catch (error: any) {
       // If categories already exist, skip them
       if (error.message?.includes('already exists')) {
-        console.log(`⚠️  Some categories already exist, skipping duplicates`)
+        // Categories already exist, continue
       } else {
         throw error
       }
     }
-  } else {
-    console.log(`ℹ️  All level 2 categories already exist`)
   }
 
   // Refresh categories after level 2 to get latest state
-  const updatedCategories2 = await productModule.listProductCategories({}, { take: 9999 })
-  existingByName = new Map(updatedCategories2.map((c: any) => [c.name, c]))
-  existingByHandle = new Set(updatedCategories2.map((c: any) => c.handle))
+  const updatedCategories2 = await fetchCategoriesWithFields()
+  existingByName = new Map(updatedCategories2.filter((c: any) => c && c.name).map((c: any) => [c.name, c]))
+  existingByHandle = new Map(updatedCategories2.filter((c: any) => c && c.handle).map((c: any) => [c.handle, c]))
+  
+  // Create reverse lookup for level 2 categories
+  for (const [level1Name, level2Names] of categoryHierarchy.entries()) {
+    for (const expectedLevel2Name of level2Names) {
+      if (!existingByName.has(expectedLevel2Name)) {
+        const handle = toHandle(expectedLevel2Name)
+        const byHandle = existingByHandle.get(handle)
+        if (byHandle) {
+          existingByName.set(expectedLevel2Name, byHandle)
+        }
+      }
+    }
+  }
 
   // Level 3: Create all product type categories
   const level3ToCreate: Array<{ name: string; parent: string }> = []
   
   for (const [level2Key, level3Names] of subcategoryHierarchy.entries()) {
     const [level1Name, level2Name] = level2Key.split('::')
-    const parentCategory = existingByName.get(level2Name)
+    let parentCategory = existingByName.get(level2Name)
     
     if (!parentCategory) {
-      console.warn(`⚠️  Parent category "${level2Name}" not found, skipping product types`)
-      continue
+      // Try to find by handle
+      const handle = toHandle(level2Name)
+      const byHandle = existingByHandle.get(handle)
+      if (byHandle) {
+        parentCategory = byHandle
+        existingByName.set(level2Name, byHandle)
+      } else {
+        // Try case-insensitive search
+        const found = Array.from(existingByName.values()).find((c: any) => {
+          if (!c || !c.name) return false
+          return c.name.toLowerCase() === level2Name.toLowerCase() ||
+            c.name.toLowerCase().replace(/&/g, 'and') === level2Name.toLowerCase().replace(/&/g, 'and')
+        })
+        if (found) {
+          parentCategory = found
+          existingByName.set(level2Name, found)
+        } else {
+          console.warn(`⚠️  Parent category "${level2Name}" not found, skipping product types`)
+          continue
+        }
+      }
     }
     
     for (const level3Name of level3Names) {
@@ -337,37 +471,57 @@ export async function createProductCategories(container: MedusaContainer) {
         totalCreated += level3Result.length
         level3Result.forEach((c: any) => {
           existingByName.set(c.name, c)
-          existingByHandle.add(c.handle)
+          existingByHandle.set(c.handle, c)
         })
-        console.log(`   Created ${totalCreated}/${level3ToCreate.length} level 3 categories...`)
       } catch (error: any) {
         // If batch creation fails, skip the batch
         if (error.message?.includes('already exists')) {
-          console.log(`   ⚠️  Some categories in batch already exist, skipping duplicates`)
           totalSkipped += batch.length
         } else {
-          console.log(`   ⚠️  Batch creation failed: ${error.message || 'Unknown error'}`)
+          console.warn(`⚠️  Batch creation failed: ${error.message || 'Unknown error'}`)
           totalSkipped += batch.length
         }
         // Refresh maps after error to get latest state
-        const updatedBatch = await productModule.listProductCategories({}, { take: 9999 })
-        existingByName = new Map(updatedBatch.map((c: any) => [c.name, c]))
-        existingByHandle = new Set(updatedBatch.map((c: any) => c.handle))
-        console.log(`   Progress: ${totalCreated + totalSkipped}/${level3ToCreate.length} level 3 categories processed...`)
+        const updatedBatch = await fetchCategoriesWithFields()
+        existingByName = new Map(updatedBatch.filter((c: any) => c && c.name).map((c: any) => [c.name, c]))
+        existingByHandle = new Map(updatedBatch.filter((c: any) => c && c.handle).map((c: any) => [c.handle, c]))
       }
     }
     if (totalCreated > 0) {
       console.log(`✅ Created ${totalCreated} level 3 categories`)
     }
-    if (totalSkipped > 0) {
-      console.log(`ℹ️  Skipped ${totalSkipped} level 3 categories (already exist)`)
-    }
-  } else {
-    console.log(`ℹ️  All level 3 categories already exist`)
   }
 
-  const finalCategories = await productModule.listProductCategories({}, { take: 9999 })
-  console.log(`✅ Total categories in database: ${finalCategories.length}`)
+  // Use query.graph to get categories with proper fields for accurate breakdown
+  const { data: finalCategoriesWithFields } = await query.graph({
+    entity: 'product_category',
+    fields: ['id', 'name', 'handle', 'parent_category_id'],
+    filters: {},
+    pagination: { take: 9999 }
+  })
+  
+  console.log(`✅ Total categories in database: ${finalCategoriesWithFields.length}`)
+  
+  // Build a map for quick parent lookups
+  const categoryMap = new Map(finalCategoriesWithFields.map((c: any) => [c.id, c]))
+  
+  // Log summary by level
+  const level1Count = finalCategoriesWithFields.filter((c: any) => !c.parent_category_id).length
+  const level2Count = finalCategoriesWithFields.filter((c: any) => {
+    if (!c.parent_category_id) return false
+    const parent = categoryMap.get(c.parent_category_id)
+    return parent && !parent.parent_category_id
+  }).length
+  const level3Count = finalCategoriesWithFields.filter((c: any) => {
+    if (!c.parent_category_id) return false
+    const parent = categoryMap.get(c.parent_category_id)
+    return parent && parent.parent_category_id
+  }).length
+  
+  console.log(`📊 Category breakdown: ${level1Count} Level 1, ${level2Count} Level 2, ${level3Count} Level 3`)
+  
+  // Return categories with proper fields
+  const finalCategories = finalCategoriesWithFields
 
   return finalCategories
 }
@@ -378,7 +532,6 @@ export async function createProductCollections(container: MedusaContainer) {
   // Check if collections already exist
   const existingCollections = await productModule.listProductCollections({})
   if (existingCollections && existingCollections.length > 0) {
-    console.log('Product collections already exist, skipping creation')
     return existingCollections
   }
 
@@ -436,9 +589,6 @@ export async function createProductTypes(container: MedusaContainer) {
   if (createdTypes.length > 0) {
     console.log(`✅ Created ${createdTypes.length} product types`)
   }
-  if (skippedCount > 0) {
-    console.log(`ℹ️  Skipped ${skippedCount} existing product types`)
-  }
 
   return [...existingTypes, ...createdTypes]
 }
@@ -450,7 +600,6 @@ export async function createSeller(container: MedusaContainer) {
   // Check if seller already exists by handle
   const existingSellers = await sellerService.listSellers({ handle: 'mercurjs-store' })
   if (existingSellers && existingSellers.length > 0) {
-    console.log('Seller already exists, skipping creation')
     return existingSellers[0]
   }
 
@@ -498,7 +647,6 @@ export async function createSellerStockLocation(
   })
   
   if (existingStockLocations && existingStockLocations.length > 0) {
-    console.log('Stock location for seller already exists, skipping creation')
     return existingStockLocations[0]
   }
 
@@ -588,7 +736,6 @@ export async function createServiceZoneForFulfillmentSet(
   })
   
   if (existingZones && existingZones.length > 0) {
-    console.log('Service zone for fulfillment set already exists, skipping creation')
     return existingZones[0]
   }
 
@@ -697,7 +844,6 @@ export async function createSellerProducts(
   // Check if products already exist
   const existingProducts = await productService.listProducts({})
   if (existingProducts && existingProducts.length > 0) {
-    console.log('Products already exist, skipping creation')
     return existingProducts
   }
 
@@ -754,7 +900,6 @@ export async function createInventoryItemStockLevels(
     location_id: stockLocationId
   })
   if (existingLevels && existingLevels.length > 0) {
-    console.log('Inventory levels already exist, skipping creation')
     return existingLevels
   }
 
@@ -784,7 +929,6 @@ export async function createDefaultCommissionLevel(container: MedusaContainer) {
   // Check if default commission rule already exists
   const existingRules = await commissionService.listCommissionRules({ name: 'default' })
   if (existingRules && existingRules.length > 0) {
-    console.log('Default commission rule already exists, skipping creation')
     return
   }
 
@@ -811,7 +955,6 @@ export async function createAdminUser(container: MedusaContainer) {
   // Check if admin user already exists
   const existingUsers = await userService.listUsers({ email: 'admin@medusa-test.com' })
   if (existingUsers && existingUsers.length > 0) {
-    console.log('Admin user already exists, skipping creation')
     return existingUsers[0]
   }
 
@@ -847,7 +990,6 @@ export async function createConfigurationRules(container: MedusaContainer) {
   for (const [ruleType, isEnabled] of ConfigurationRuleDefaults) {
     // Skip if rule already exists
     if (existingRuleTypes.has(ruleType)) {
-      console.log(`Configuration rule "${ruleType}" already exists, skipping`)
       continue
     }
     
