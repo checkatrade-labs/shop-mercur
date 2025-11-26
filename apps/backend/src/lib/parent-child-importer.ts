@@ -335,7 +335,7 @@ export async function importParentGroup(
     }
 
     let product: any
-    let productId: string
+    let productId: string | undefined
 
     if (existingProduct) {
       // Product already exists, use it
