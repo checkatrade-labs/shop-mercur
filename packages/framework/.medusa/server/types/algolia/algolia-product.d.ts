@@ -209,8 +209,8 @@ export declare const AlgoliaVariantValidator: z.ZodObject<{
     barcode: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     ean: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     ups: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    allow_backorder: z.ZodBoolean;
-    manage_inventory: z.ZodBoolean;
+    allow_backorder: z.ZodOptional<z.ZodBoolean>;
+    manage_inventory: z.ZodOptional<z.ZodBoolean>;
     hs_code: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     origin_country: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     mid_code: z.ZodOptional<z.ZodNullable<z.ZodString>>;
@@ -220,82 +220,73 @@ export declare const AlgoliaVariantValidator: z.ZodObject<{
     height: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     wifth: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     variant_rank: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    options: z.ZodArray<z.ZodObject<{
-        id: z.ZodString;
+    metadata: z.ZodOptional<z.ZodNullable<z.ZodRecord<z.ZodString, z.ZodUnknown>>>;
+    options: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodOptional<z.ZodString>;
         value: z.ZodString;
-        option: z.ZodObject<{
-            id: z.ZodString;
+        option: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+            id: z.ZodOptional<z.ZodString>;
             title: z.ZodString;
         }, "strip", z.ZodTypeAny, {
-            id: string;
             title: string;
+            id?: string | undefined;
         }, {
-            id: string;
             title: string;
-        }>;
+            id?: string | undefined;
+        }>>>;
     }, "strip", z.ZodTypeAny, {
-        id: string;
         value: string;
-        option: {
-            id: string;
+        id?: string | undefined;
+        option?: {
             title: string;
-        };
+            id?: string | undefined;
+        } | null | undefined;
     }, {
-        id: string;
         value: string;
-        option: {
-            id: string;
+        id?: string | undefined;
+        option?: {
             title: string;
-        };
-    }>, "many">;
-    prices: z.ZodArray<z.ZodObject<{
-        id: z.ZodString;
+            id?: string | undefined;
+        } | null | undefined;
+    }>, "many">>;
+    prices: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodOptional<z.ZodString>;
         title: z.ZodOptional<z.ZodNullable<z.ZodString>>;
         currency_code: z.ZodString;
         min_quantity: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         max_quantity: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-        rules_count: z.ZodNumber;
+        rules_count: z.ZodOptional<z.ZodNumber>;
         amount: z.ZodNumber;
     }, "strip", z.ZodTypeAny, {
-        id: string;
         currency_code: string;
-        rules_count: number;
         amount: number;
+        id?: string | undefined;
         title?: string | null | undefined;
         min_quantity?: number | null | undefined;
         max_quantity?: number | null | undefined;
+        rules_count?: number | undefined;
     }, {
-        id: string;
         currency_code: string;
-        rules_count: number;
         amount: number;
+        id?: string | undefined;
         title?: string | null | undefined;
         min_quantity?: number | null | undefined;
         max_quantity?: number | null | undefined;
-    }>, "many">;
+        rules_count?: number | undefined;
+    }>, "many">>;
 }, "strip", z.ZodTypeAny, {
     id: string;
-    options: {
-        id: string;
-        value: string;
-        option: {
-            id: string;
-            title: string;
-        };
-    }[];
-    allow_backorder: boolean;
-    manage_inventory: boolean;
-    prices: {
-        id: string;
-        currency_code: string;
-        rules_count: number;
-        amount: number;
-        title?: string | null | undefined;
-        min_quantity?: number | null | undefined;
-        max_quantity?: number | null | undefined;
-    }[];
+    metadata?: Record<string, unknown> | null | undefined;
     title?: string | null | undefined;
     length?: number | null | undefined;
+    options?: {
+        value: string;
+        id?: string | undefined;
+        option?: {
+            title: string;
+            id?: string | undefined;
+        } | null | undefined;
+    }[] | undefined;
     sku?: string | null | undefined;
     ean?: string | null | undefined;
     barcode?: string | null | undefined;
@@ -306,31 +297,32 @@ export declare const AlgoliaVariantValidator: z.ZodObject<{
     origin_country?: string | null | undefined;
     material?: string | null | undefined;
     ups?: string | null | undefined;
+    allow_backorder?: boolean | undefined;
+    manage_inventory?: boolean | undefined;
     wifth?: number | null | undefined;
     variant_rank?: number | null | undefined;
+    prices?: {
+        currency_code: string;
+        amount: number;
+        id?: string | undefined;
+        title?: string | null | undefined;
+        min_quantity?: number | null | undefined;
+        max_quantity?: number | null | undefined;
+        rules_count?: number | undefined;
+    }[] | undefined;
 }, {
     id: string;
-    options: {
-        id: string;
-        value: string;
-        option: {
-            id: string;
-            title: string;
-        };
-    }[];
-    allow_backorder: boolean;
-    manage_inventory: boolean;
-    prices: {
-        id: string;
-        currency_code: string;
-        rules_count: number;
-        amount: number;
-        title?: string | null | undefined;
-        min_quantity?: number | null | undefined;
-        max_quantity?: number | null | undefined;
-    }[];
+    metadata?: Record<string, unknown> | null | undefined;
     title?: string | null | undefined;
     length?: number | null | undefined;
+    options?: {
+        value: string;
+        id?: string | undefined;
+        option?: {
+            title: string;
+            id?: string | undefined;
+        } | null | undefined;
+    }[] | undefined;
     sku?: string | null | undefined;
     ean?: string | null | undefined;
     barcode?: string | null | undefined;
@@ -341,7 +333,18 @@ export declare const AlgoliaVariantValidator: z.ZodObject<{
     origin_country?: string | null | undefined;
     material?: string | null | undefined;
     ups?: string | null | undefined;
+    allow_backorder?: boolean | undefined;
+    manage_inventory?: boolean | undefined;
     wifth?: number | null | undefined;
     variant_rank?: number | null | undefined;
+    prices?: {
+        currency_code: string;
+        amount: number;
+        id?: string | undefined;
+        title?: string | null | undefined;
+        min_quantity?: number | null | undefined;
+        max_quantity?: number | null | undefined;
+        rules_count?: number | undefined;
+    }[] | undefined;
 }>;
 //# sourceMappingURL=algolia-product.d.ts.map

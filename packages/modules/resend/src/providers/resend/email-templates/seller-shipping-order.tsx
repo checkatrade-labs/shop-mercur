@@ -33,31 +33,37 @@ interface EmailTemplateProps {
 
 export const SellerOrderShippingEmailTemplate: React.FC<Readonly<EmailTemplateProps>> = ({ data }) => {
   return (
-    <div>
-      <h1>The order #{data.order.display_id} has been marked as shipped.</h1>
-      <p>
-        <div>
-          <p>
-            <strong>Delivery Address:</strong>
-          </p>
-          <p>
-            {data.order.shipping_address.first_name} {data.order.shipping_address.last_name}
-            ,<br />
-            {data.order.shipping_address?.company ? `${data.order.shipping_address.company}, ` : ''}
-            {data.order.shipping_address.address_1}
-            {data.order.shipping_address.address_2}, {data.order.shipping_address.postal_code}{' '}
-            {data.order.shipping_address.city}
-            {data.order.shipping_address.province ? `, ${data.order.shipping_address.province}` : ''}
-            <br />
-            {data.order.email}, {data.order.shipping_address.phone}
-          </p>
-        </div>
+    <div style={{
+      maxWidth: 600,
+      margin: '0 auto',
+      fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
+      color: '#040154',
+      backgroundColor: '#ffffff',
+      padding: 24,
+      borderRadius: 10
+    }}>
+      <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>Order #{data.order.display_id} marked as shipped</h1>
+      <p style={{ fontSize: '1.1rem', marginBottom: 24, lineHeight: 1.6 }}>
+        The shipping status has been updated and the customer has been notified.
       </p>
-      <p>Thank you for updating the status of the order. If you have any questions, please contact our support team.</p>
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginBottom: 24 }}>
+        <p style={{ marginBottom: 4 }}>
+          <strong>Delivery address:</strong><br />
+          {data.order.shipping_address.first_name} {data.order.shipping_address.last_name},<br />
+          {data.order.shipping_address?.company ? `${data.order.shipping_address.company}, ` : ''}
+          {data.order.shipping_address.address_1}
+          {data.order.shipping_address.address_2 && `, ${data.order.shipping_address.address_2}`}, {data.order.shipping_address.postal_code} {data.order.shipping_address.city}
+          {data.order.shipping_address.province ? `, ${data.order.shipping_address.province}` : ''}
+          <br />
+          {data.order.email}, {data.order.shipping_address.phone}
+        </p>
+      </div>
+      <div style={{ fontSize: 13, color: '#040154', marginBottom: 24, opacity: 0.8 }}>
+        For platform queries, email shop@checkatrade.com.
+      </div>
+      <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercurjs.com</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   )

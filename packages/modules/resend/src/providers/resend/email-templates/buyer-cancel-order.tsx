@@ -18,15 +18,15 @@ export const BuyerCancelOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps
     <div style={{
       maxWidth: 600,
       margin: '0 auto',
-      fontFamily: 'Arial, sans-serif',
-      color: '#222',
-      background: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
+      color: '#040154',
+      backgroundColor: '#ffffff',
       padding: 24,
       borderRadius: 10
     }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>Your order has been canceled</h1>
-      <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
-        We're sorry, but your order <b>#{order.display_id || order.id}</b> has been canceled by the seller.
+      <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>Order #{order.display_id || order.id} has been cancelled</h1>
+      <p style={{ fontSize: '1.1rem', marginBottom: 24, lineHeight: 1.6 }}>
+        Your order has been cancelled by the seller.
       </p>
 
       <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order items:</h3>
@@ -67,13 +67,13 @@ export const BuyerCancelOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps
                 </div>
               </td>
               <td style={{ textAlign: 'right', padding: '12px 8px', verticalAlign: 'top' }}>
-                {item.unit_price} eur
+                {item.unit_price} {item.currency_code || "gbp"}
               </td>
               <td style={{ textAlign: 'right', padding: '12px 8px', verticalAlign: 'top' }}>
                 {item.quantity}
               </td>
               <td style={{ textAlign: 'right', padding: '12px 8px', verticalAlign: 'top' }}>
-                {item.unit_price * item.quantity} eur
+                {item.unit_price * item.quantity} {item.currency_code || "gbp"}
               </td>
             </tr>
           ))}
@@ -81,7 +81,7 @@ export const BuyerCancelOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps
       </table>
 
       <div style={{ margin: '32px 0 16px 0', fontSize: '1rem' }}>
-        If you have any questions, please contact <b>Mercur Support</b>.
+        If you have any questions, please contact us at shop@checkatrade.com.
       </div>
 
       <div style={{ marginBottom: 24 }}>
@@ -90,31 +90,26 @@ export const BuyerCancelOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps
           style={{
             display: 'inline-block',
             padding: '10px 24px',
-            background: '#222',
-            color: '#fff',
-            borderRadius: 6,
+            backgroundColor: '#FF3F3F',
+            color: '#ffffff',
+            borderRadius: '6px',
             textDecoration: 'none',
             fontWeight: 600,
-            marginBottom: 8
+            marginBottom: 8,
+            border: 'none'
           }}
         >
           View Order Details
         </a>
-        <div style={{ fontSize: 13, color: '#555', marginTop: 8 }}>
-          If you can’t click the button, here’s your link: <br />
-          <span style={{ color: '#0070f3' }}>{data.order_address}</span>
+        <div style={{ fontSize: 13, color: '#040154', marginTop: 8, opacity: 0.7 }}>
+          If you can't click the button, here's your link: <br />
+          <span style={{ color: '#606FFF' }}>{data.order_address}</span>
         </div>
       </div>
 
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        You received this email because you made a purchase or sale on the Mercur marketplace.
-        If you have any questions, please contact our support team.
-      </div>
-
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
       </div>
     </div>
   );

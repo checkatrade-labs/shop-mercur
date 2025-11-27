@@ -35,18 +35,18 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
     <div style={{
       maxWidth: 600,
       margin: '0 auto',
-      fontFamily: 'Arial, sans-serif',
-      color: '#222',
-      background: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
+      color: '#040154',
+      backgroundColor: '#ffffff',
       padding: 24,
       borderRadius: 10
     }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        Thank you for your order, {data.user_name}!<br />
-        Your order #{order.display_id} has been placed!
+      <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>
+        Your Checkatrade Shop order #{order.display_id} is confirmed
       </h1>
-      <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
-        Thank you for placing order #{order.display_id}.<br />
+      <p style={{ fontSize: '1.1rem', marginBottom: 24, lineHeight: 1.6 }}>
+        Hi {data.user_name},<br />
+        Thanks for shopping with Checkatrade Shop.
       </p>
       <div style={{ marginBottom: 24 }}>
         <a
@@ -54,22 +54,23 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
           style={{
             display: 'inline-block',
             padding: '10px 24px',
-            background: '#222',
-            color: '#fff',
-            borderRadius: 6,
+            backgroundColor: '#FF3F3F',
+            color: '#ffffff',
+            borderRadius: '6px',
             textDecoration: 'none',
             fontWeight: 600,
-            marginBottom: 8
+            marginBottom: 8,
+            border: 'none'
           }}
         >
           Order details
         </a>
-        <div style={{ fontSize: 13, color: '#555', marginTop: 8 }}>
-          If you can’t click the button, here’s your link: <br />
-          <span style={{ color: '#0070f3' }}>{data.order_address}</span>
+        <div style={{ fontSize: 13, color: '#040154', marginTop: 8, opacity: 0.7 }}>
+          If you can't click the button, here's your link: <br />
+          <span style={{ color: '#606FFF' }}>{data.order_address}</span>
         </div>
       </div>
-      <h3 style={{ marginTop: 32, marginBottom: 12 }}>Here’s the breakdown:</h3>
+      <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order summary:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
         <thead>
           <tr>
@@ -150,13 +151,12 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
         </div>
       </div>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        You received this email because you made a purchase or sale on the Mercur marketplace.<br />
-        If you have any questions, please contact our support team.
+        For questions about your order, contact the seller directly.<br />
+        For anything else, email shop@checkatrade.com.
       </div>
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercurjs.com</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
       </div>
     </div>
   )

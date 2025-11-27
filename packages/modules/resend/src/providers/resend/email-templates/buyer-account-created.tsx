@@ -14,39 +14,37 @@ export const BuyerAccountCreatedEmailTemplate: React.FC<
         margin: "40px auto",
         padding: "32px 24px",
         borderRadius: "12px",
-        background: "#fff",
+        backgroundColor: "#ffffff",
         boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-        fontFamily: "Arial, sans-serif",
-        color: "#222",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+        color: "#040154",
       }}
     >
-      <h1 style={{ fontSize: "2rem", marginBottom: "16px", color: "#222" }}>
-        Welcome to Mercur, {data.user_name}!
+      <h1 style={{ fontSize: "2rem", marginBottom: "16px", color: "#4D0000", fontWeight: 700 }}>
+        Welcome to Checkatrade Shop, {data.user_name}
       </h1>
-      <p style={{ fontSize: "1.1rem", marginBottom: "24px" }}>
-        We’re excited to have you join us on this journey.
-        <br />
+      <p style={{ fontSize: "1.1rem", marginBottom: "24px", lineHeight: 1.6 }}>
         Your account has been created successfully.
       </p>
       <a
-        href="https://mercurjs.com"
+        href="https://shop.checkatrade.com"
         style={{
           display: "inline-block",
           padding: "12px 28px",
-          background: "#222",
-          color: "#fff",
+          backgroundColor: "#FF3F3F",
+          color: "#ffffff",
           borderRadius: "6px",
           textDecoration: "none",
           fontWeight: 600,
           marginBottom: "32px",
+          border: "none"
         }}
       >
-        Visit Mercur
+        Visit Checkatrade Shop
       </a>
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, color: "#040154" }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: "#888", marginTop: 4 }}>mercurjs.com</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
       </div>
     </div>
   );
