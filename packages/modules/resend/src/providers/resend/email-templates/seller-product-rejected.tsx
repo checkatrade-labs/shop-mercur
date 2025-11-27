@@ -9,22 +9,24 @@ export const SellerProductRejectedEmailTemplate: React.FC<Readonly<EmailTemplate
     <div style={{
       maxWidth: 600,
       margin: '0 auto',
-      fontFamily: 'Arial, sans-serif',
-      color: '#222',
-      background: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
+      color: '#040154',
+      backgroundColor: '#ffffff',
       padding: 24,
       borderRadius: 10
     }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        Hello <span role="img" aria-label="wave">👋</span>
+      <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>
+        Product not approved
       </h1>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        We regret to inform you that your product {data.product_title} has been rejected.
-      </h1>
-      <div style={{ marginTop: 32 }}>
+      <p style={{ fontSize: '1.1rem', marginBottom: 16, lineHeight: 1.6 }}>
+        Your product "{data.product_title}" has not been approved for listing on Checkatrade Shop.
+      </p>
+      <p style={{ fontSize: '1.1rem', marginBottom: 16, lineHeight: 1.6 }}>
+        For more information, please contact shop@checkatrade.com.
+      </p>
+      <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   )

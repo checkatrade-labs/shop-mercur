@@ -25,19 +25,18 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
     <div style={{
       maxWidth: 600,
       margin: '0 auto',
-      fontFamily: 'Arial, sans-serif',
-      color: '#222',
-      background: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
+      color: '#040154',
+      backgroundColor: '#fff',
       padding: 24,
       borderRadius: 10
     }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        Hello, {order.seller.name}!
-        <br />
-        You have received a new order!
+      <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>
+        New order #{order.display_id}
       </h1>
-      <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
-        Order <b>#{order.display_id}</b> has just been placed by {order.customer.first_name} {order.customer.last_name}.
+      <p style={{ fontSize: '1.1rem', marginBottom: 24, lineHeight: 1.6 }}>
+        Hi {order.seller.name},<br />
+        You have received a new order from {order.customer.first_name} {order.customer.last_name}. Please review the details and begin fulfilment.
       </p>
       <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order items:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
@@ -77,26 +76,24 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
                 </div>
               </td>
               <td style={{ textAlign: 'right', padding: '12px 8px', verticalAlign: 'top' }}>
-                {item.unit_price} eur
+                {item.unit_price} {item.currency_code || "gbp"}
               </td>
               <td style={{ textAlign: 'right', padding: '12px 8px', verticalAlign: 'top' }}>
                 {item.quantity}
               </td>
               <td style={{ textAlign: 'right', padding: '12px 8px', verticalAlign: 'top' }}>
-                {item.unit_price * item.quantity} eur
+                {item.unit_price * item.quantity} {item.currency_code || "gbp"}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        You received this email because you are a seller on the Mercur marketplace.<br />
-        If you have any questions, please contact our support team.
+      <div style={{ fontSize: 13, color: '#040154', marginBottom: 24, opacity: 0.8 }}>
+        For platform or payment queries, email shop@checkatrade.com.
       </div>
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   );
