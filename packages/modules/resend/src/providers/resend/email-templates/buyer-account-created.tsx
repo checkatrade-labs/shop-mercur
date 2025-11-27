@@ -14,7 +14,7 @@ export const BuyerAccountCreatedEmailTemplate: React.FC<
         margin: "40px auto",
         padding: "32px 24px",
         borderRadius: "12px",
-        background: "#fff",
+        backgroundColor: "#ffffff",
         boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
         color: "#040154",

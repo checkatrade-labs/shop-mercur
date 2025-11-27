@@ -11,7 +11,7 @@ export const SellerProductRejectedEmailTemplate: React.FC<Readonly<EmailTemplate
       margin: '0 auto',
       fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
       color: '#040154',
-      background: '#fff',
+      backgroundColor: '#ffffff',
       padding: 24,
       borderRadius: 10
     }}>
