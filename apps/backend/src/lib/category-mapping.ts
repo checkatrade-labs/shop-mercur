@@ -135,6 +135,9 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   // Renewable & Energy → Solar Battery
   'BATTERY_STORAGE': { level1: 'Renewable & Energy', level2: 'Solar Battery', level3: 'Battery Storage' },
 
+  // Electrical & Lighting → Fans & Air Conditioning Units
+  'AIR_CONDITIONERS': { level1: 'Electrical & Lighting', level2: 'Fans & Air Conditioning Units', level3: 'Air Conditioners' },
+
   // Heating and Plumbing → Boilers
   'BOILERS': { level1: 'Heating and Plumbing', level2: 'Boilers', level3: 'Boilers' },
 
