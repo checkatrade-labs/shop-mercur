@@ -36,14 +36,14 @@ export const SellerOrderShippingEmailTemplate: React.FC<Readonly<EmailTemplatePr
     <div style={{
       maxWidth: 600,
       margin: '0 auto',
-      fontFamily: 'Arial, sans-serif',
-      color: '#222',
+      fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Helvetica Neue\', Arial, sans-serif',
+      color: '#040154',
       background: '#fff',
       padding: 24,
       borderRadius: 10
     }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>Order #{data.order.display_id} marked as shipped</h1>
-      <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
+      <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>Order #{data.order.display_id} marked as shipped</h1>
+      <p style={{ fontSize: '1.1rem', marginBottom: 24, lineHeight: 1.6 }}>
         The shipping status has been updated and the customer has been notified.
       </p>
       <div style={{ marginBottom: 24 }}>
@@ -58,10 +58,10 @@ export const SellerOrderShippingEmailTemplate: React.FC<Readonly<EmailTemplatePr
           {data.order.email}, {data.order.shipping_address.phone}
         </p>
       </div>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
+      <div style={{ fontSize: 13, color: '#040154', marginBottom: 24, opacity: 0.8 }}>
         For platform queries, email shop@checkatrade.com.
       </div>
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
         <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>

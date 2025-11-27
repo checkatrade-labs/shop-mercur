@@ -60,7 +60,7 @@ export async function calculateWishlistProductsPrice(
 
   const calculatedPrices = await pricingModuleService.calculatePrices(
     { id: priceSetIds },
-    { context: { currency_code: allProducts[0]?.currency_code || "eur" } }
+    { context: { currency_code: allProducts[0]?.currency_code || "gbp" } }
   );
 
   const calculatedPriceMap = new Map(
