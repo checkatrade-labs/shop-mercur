@@ -43,7 +43,7 @@ module.exports = defineConfig({
       options: {},
     },
     {
-      resolve: "@mercurjs/resend",
+      resolve: "mercurjs-resend",
       options: {},
     },
   ],
