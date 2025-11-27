@@ -21,15 +21,13 @@ export const BuyerAccountCreatedEmailTemplate: React.FC<
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "16px", color: "#222" }}>
-        Welcome to Mercur, {data.user_name}!
+        Welcome to Checkatrade Shop, {data.user_name}
       </h1>
       <p style={{ fontSize: "1.1rem", marginBottom: "24px" }}>
-        We’re excited to have you join us on this journey.
-        <br />
         Your account has been created successfully.
       </p>
       <a
-        href="https://mercurjs.com"
+        href="https://shop.checkatrade.com"
         style={{
           display: "inline-block",
           padding: "12px 28px",
@@ -41,12 +39,11 @@ export const BuyerAccountCreatedEmailTemplate: React.FC<
           marginBottom: "32px",
         }}
       >
-        Visit Mercur
+        Visit Checkatrade Shop
       </a>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: "#888", marginTop: 4 }}>mercurjs.com</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
       </div>
     </div>
   );

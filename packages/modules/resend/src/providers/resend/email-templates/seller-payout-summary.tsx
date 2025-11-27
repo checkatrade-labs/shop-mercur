@@ -36,10 +36,12 @@ export const SellerPayoutSummaryEmailTemplate: React.FC<
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: 8 }}>
-        Hello, {seller.name}!
-        <br />
-        You have received new transfers to your Stripe account!
+        New transfers to your account
       </h1>
+      <p style={{ fontSize: "1.1rem", marginBottom: 24 }}>
+        Hi {seller.name},<br />
+        The following transfers have been made to your Stripe account.
+      </p>
       <h3 style={{ marginTop: 32, marginBottom: 12 }}>Transfer list:</h3>
       <table
         style={{ width: "100%", borderCollapse: "collapse", marginBottom: 32 }}
@@ -108,15 +110,11 @@ export const SellerPayoutSummaryEmailTemplate: React.FC<
         </tbody>
       </table>
       <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
-        You received this email because you are a seller on the Mercur
-        marketplace.
-        <br />
-        If you have any questions, please contact our support team.
+        For platform or payment queries, email shop@checkatrade.com.
       </div>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: "#888", marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   );

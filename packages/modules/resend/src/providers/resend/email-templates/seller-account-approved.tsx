@@ -16,25 +16,23 @@ export const SellerAccountApprovedEmailTemplate: React.FC<Readonly<EmailTemplate
       borderRadius: 10
     }}>
       <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        Hello, {data.user_name} <span role="img" aria-label="wave">👋</span>
-        <br />
-        <span style={{ fontSize: '1.5rem', fontWeight: 600 }}>Your account has been approved!</span>
+        Your seller account has been approved
       </h1>
       <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>
-        We’re happy to let you know that your application has been approved! This means your account is now activated on
-        the Mercur marketplace.
+        Hi {data.user_name},
+      </p>
+      <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>
+        Your application has been approved and your account is now active on Checkatrade Shop.
       </p>
       <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
-        Thank you for choosing us. We are excited about your success and will support you every step of the way.
+        You can now start listing your products and managing orders.
       </p>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        You received this email because you registered as a seller on the Mercur marketplace.<br />
-        If you have any questions, please contact our support team.
+        If you have any questions, please email shop@checkatrade.com.
       </div>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   )

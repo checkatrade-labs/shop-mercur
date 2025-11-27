@@ -20,6 +20,9 @@ interface EmailTemplateProps {
 
 export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> = ({ data }) => {
   const { order } = data;
+  console.log("--------------------------------");
+  console.log(JSON.stringify(order, null, 2));
+  console.log("--------------------------------");
 
   return (
     <div style={{
@@ -32,12 +35,11 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
       borderRadius: 10
     }}>
       <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        Hello, {order.seller.name}!
-        <br />
-        You have received a new order!
+        New order #{order.display_id}
       </h1>
       <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
-        Order <b>#{order.display_id}</b> has just been placed by {order.customer.first_name} {order.customer.last_name}.
+        Hi {order.seller.name},<br />
+        You have received a new order from {order.customer.first_name} {order.customer.last_name}. Please review the details and begin fulfilment.
       </p>
       <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order items:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
@@ -90,13 +92,11 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
         </tbody>
       </table>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        You received this email because you are a seller on the Mercur marketplace.<br />
-        If you have any questions, please contact our support team.
+        For platform or payment queries, email shop@checkatrade.com.
       </div>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   );

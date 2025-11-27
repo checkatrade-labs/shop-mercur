@@ -17,15 +17,14 @@ export const AdminRequestCreatedEmailTemplate: React.FC<Readonly<EmailTemplatePr
       borderRadius: 10
     }}>
       <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
-        Hello, <span role="img" aria-label="wave">👋</span>
+        New {data.request_type} request
       </h1>
       <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>
-        {data.seller_name} has requested to create a new {data.request_type}. Please review the request and approve it in admin panel.
+        {data.seller_name} has requested to create a new {data.request_type}. Please review and approve the request in the admin panel.
       </p>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
       </div>
     </div>
   )

@@ -15,19 +15,22 @@ export const SellerAccountSubmissionEmailTemplate: React.FC<Readonly<EmailTempla
       padding: 24,
       borderRadius: 10
     }}>
-      <h1>Hello, {data.user_name} 👋</h1>
-      <p>We are thrilled about your interest in collaborating with us.</p>
-      <p>
-        Your application is currently being reviewed by our team. Please expect a response within [three] business days.
-        If your submission meets our criteria and is accepted, you will receive a confirmation email from us.
+      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>Your application is under review</h1>
+      <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>
+        Hi {data.user_name},
       </p>
-      <p>
-        In the meantime, if you have any questions or need further assistance, feel free to reach out to us.
+      <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>
+        Thank you for your interest in selling on Checkatrade Shop.
+      </p>
+      <p style={{ fontSize: '1.1rem', marginBottom: 16 }}>
+        Your application is currently being reviewed by our team. You can expect a response within 3-5 working days.
+      </p>
+      <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
+        If you have any questions, please email shop@checkatrade.com.
       </p>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercur.js</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   )

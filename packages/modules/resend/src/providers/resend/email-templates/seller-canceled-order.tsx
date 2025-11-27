@@ -44,9 +44,12 @@ export const SellerCanceledOrderEmailTemplate: React.FC<Readonly<EmailTemplatePr
       padding: 24,
       borderRadius: 10
     }}>
-      <h1>
-        An order #{data.order.display_id} has been cancelled.
+      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>
+        Order #{data.order.display_id} has been cancelled
       </h1>
+      <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>
+        This order has been cancelled and the customer has been notified.
+      </p>
 
 	    <div style={{ marginBottom: 24 }}>
         <a
@@ -65,18 +68,17 @@ export const SellerCanceledOrderEmailTemplate: React.FC<Readonly<EmailTemplatePr
           View Order Details
         </a>
         <div style={{ fontSize: 13, color: '#555', marginTop: 8 }}>
-          If you can’t click the button, here’s your link: <br />
+          If you can't click the button, here's your link: <br />
           <span style={{ color: '#0070f3' }}>{data.order_address}</span>
         </div>
       </div>
 
-      <p>
-        If you have any questions, please contact our support team.
-      </p>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
+        For platform queries, email shop@checkatrade.com.
+      </div>
       <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>The Mercur Team</div>
-        <div style={{ color: '#888', marginTop: 4 }}>mercurjs.com</div>
+        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
       </div>
     </div>
   )
