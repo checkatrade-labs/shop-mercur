@@ -2733,16 +2733,27 @@
     "@medusajs/utils" "2.10.2"
     ulid "^2.3.0"
 
-"@mercurjs/b2c-core@file:apps/backend/.yalc/@mercurjs/b2c-core":
+"@mercurjs/b2c-core@npm:mercurjs-b2c-core@*":
   version "1.5.3"
+  resolved "https://registry.yarnpkg.com/mercurjs-b2c-core/-/mercurjs-b2c-core-1.5.3.tgz#8a2f64d449846c2a433db412f7bd73d9ffaf4aa3"
+  integrity sha512-/LIOLeeMO+tpMyycDmWHXz+Co5jGmxGZhCgP4Id7lJJYQzbq/g6hDaEBJSy5cS5ykOfIrZ4qnOVAd7eSDnV9CQ==
   dependencies:
     "@adyen/api-library" "^30.0.0"
 
-"@mercurjs/framework@file:apps/backend/.yalc/@mercurjs/framework":
-  version "1.4.6"
-
-"@mercurjs/resend@file:apps/backend/.yalc/@mercurjs/resend":
+"@mercurjs/framework@*":
   version "1.4.3"
+  resolved "https://registry.yarnpkg.com/@mercurjs/framework/-/framework-1.4.3.tgz#9f0f36327bb54925a3ea443abcb0a82c428dd4ef"
+  integrity sha512-9bLbPqGxcHDQq7Lgf/Eb0PwJyPqiGz47y2SCGiNDV/iMFaUMAsHCglDuvl3NdRtafQgfM7sy3nP3HMvC/d3y3g==
+
+"@mercurjs/framework@npm:mercurjs-framework@*":
+  version "1.4.6"
+  resolved "https://registry.yarnpkg.com/mercurjs-framework/-/mercurjs-framework-1.4.6.tgz#4d9b3551271375e0d98e2124897b8b40d725a065"
+  integrity sha512-0R0wJ7QcTRC12Y7eQvRo9RvbOx5vemoueOrCpwUEsDYL562s8Ewd3qn9q5AEzmCGsRdCYdYT7En7JDRh18iHog==
+
+"@mercurjs/resend@npm:mercurjs-resend@*":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/mercurjs-resend/-/mercurjs-resend-1.4.4.tgz#db021a333c701fde2215a4c8f5e594a8c3f9928e"
+  integrity sha512-2tmsPT9qjIQjGGnnapfPKZHGGQDpeCyr3MeDTRbLpNE6f5aq1QDd6H+mOeS2tTejC1dunzEU/Dfab7VneWLj1g==
   dependencies:
     resend "^4.1.2"
 
@@ -8159,9 +8170,9 @@ ee-first@1.1.1:
   integrity sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==
 
 electron-to-chromium@^1.5.249:
-  version "1.5.260"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.5.260.tgz#73f555d3e9b9fd16ff48fc406bbad84efa9b86c7"
-  integrity sha512-ov8rBoOBhVawpzdre+Cmz4FB+y66Eqrk6Gwqd8NGxuhv99GQ8XqMAr351KEkOt7gukXWDg6gJWEMKgL2RLMPtA==
+  version "1.5.262"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.5.262.tgz#c31eed591c6628908451c9ca0f0758ed514aa003"
+  integrity sha512-NlAsMteRHek05jRUxUR0a5jpjYq9ykk6+kO0yRaMi5moe7u0fVIOeQ3Y30A8dIiWFBNUoQGi1ljb1i5VtS9WQQ==
 
 emittery@^0.13.0, emittery@^0.13.1:
   version "0.13.1"
@@ -10766,12 +10777,6 @@ media-typer@0.3.0:
   resolved "https://registry.yarnpkg.com/media-typer/-/media-typer-0.3.0.tgz#8710d7af0aa626f8fffa1ce00168545263255748"
   integrity sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==
 
-"mercurjs-payment-adyen-connect@file:apps/backend/.yalc/mercurjs-payment-adyen-connect":
-  version "1.0.4"
-  dependencies:
-    "@adyen/api-library" "^30.0.0"
-    stripe "^17.4.0"
-
 merge-descriptors@1.0.3:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/merge-descriptors/-/merge-descriptors-1.0.3.tgz#d80319a65f3c7935351e5cfdac8f9318504dbed5"
@@ -11807,9 +11812,9 @@ prelude-ls@^1.2.1:
   integrity sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==
 
 prettier@^3.3.3, prettier@^3.5.3:
-  version "3.6.2"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.6.2.tgz#ccda02a1003ebbb2bfda6f83a074978f608b9393"
-  integrity sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==
+  version "3.7.1"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.7.1.tgz#8dfbf54c98e85a113962d3d8414ae82ff3722991"
+  integrity sha512-RWKXE4qB3u5Z6yz7omJkjWwmTfLdcbv44jUVHC5NpfXwFGzvpQM798FGv/6WNK879tc+Cn0AAyherCl1KjbyZQ==
 
 pretty-format@^29.0.0, pretty-format@^29.7.0:
   version "29.7.0"
