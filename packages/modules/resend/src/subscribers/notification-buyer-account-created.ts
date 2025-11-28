@@ -30,7 +30,7 @@ export default async function buyerAccountCreatedHandler({
     channel: "email",
     template: ResendNotificationTemplates.BUYER_ACCOUNT_CREATED,
     content: {
-      subject: `Welcome to Mercur, ${customer.first_name || ""}!`,
+      subject: `Welcome to Checkatrade Shop, ${customer.first_name || ""}!`,
     },
     data: {
       data: {
