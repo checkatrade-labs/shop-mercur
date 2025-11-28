@@ -120,8 +120,17 @@ export async function importParentGroup(
     }
 
     // 5. Prepare product images (Main + Image 2-9)
-    const imageUrls = extractImages(parentRow)
-    const images: { url: string }[] = imageUrls.map(url => ({ url }))
+    // Collect images from parent row AND all child rows (variants may have their own images)
+    const parentImageUrls = extractImages(parentRow)
+    const allImageUrls = new Set<string>(parentImageUrls)
+    
+    // Also collect images from each child row (variant-specific images)
+    childRows.forEach((childRow, idx) => {
+      const childImages = extractImages(childRow)
+      childImages.forEach(url => allImageUrls.add(url))
+    })
+    
+    const images: { url: string }[] = Array.from(allImageUrls).map(url => ({ url }))
 
     // 6. Read Variation Theme Name to determine how to create options
     const variationTheme = (parentRow['Variation Theme Name'] || '').toUpperCase()
@@ -197,6 +206,13 @@ export async function importParentGroup(
 
       // Extract all variant metadata using helper function
       const metadata = extractVariantMetadata(childRow)
+      
+      // Extract variant-specific images and save to metadata
+      const variantImages = extractImages(childRow)
+      if (variantImages.length > 0) {
+        metadata.variant_images = variantImages.join(',') // Store as comma-separated string
+        metadata.variant_main_image = variantImages[0] // Store main image separately for easy access
+      }
 
       return {
         title: variantTitle,
@@ -343,6 +359,25 @@ export async function importParentGroup(
       productId = product.id
       console.log(`   [DEBUG ${parentSKU}] ⚠️  Product with handle "${handle}" already exists (ID: ${productId}), skipping creation`)
       
+      // Update images for existing product if we have new images
+      if (images.length > 0) {
+        try {
+          const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+          await updateProductsWorkflow(scope).run({
+            input: {
+              selector: { id: productId },
+              update: {
+                images,
+              }
+            }
+          })
+          console.log(`   [DEBUG ${parentSKU}] ✓ Updated product images (${images.length} images)`)
+        } catch (imageUpdateError: any) {
+          console.log(`   [DEBUG ${parentSKU}] ⚠️  Failed to update images: ${imageUpdateError.message}`)
+          // Non-fatal error, continue
+        }
+      }
+      
       // Filter out existing variants
       if (existingSkus.size > 0) {
         console.log(`   [DEBUG ${parentSKU}] ⚠️  Found ${existingSkus.size} existing variants with SKUs: ${Array.from(existingSkus).join(', ')}`)
@@ -391,6 +426,26 @@ export async function importParentGroup(
               product = foundProducts[0]
               productId = product.id
               console.log(`   [DEBUG ${parentSKU}] ✓ Found product that owns existing variants: ${productId}`)
+              
+              // Update images for existing product if we have new images
+              if (images.length > 0) {
+                try {
+                  const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+                  await updateProductsWorkflow(scope).run({
+                    input: {
+                      selector: { id: productId },
+                      update: {
+                        images,
+                      }
+                    }
+                  })
+                  console.log(`   [DEBUG ${parentSKU}] ✓ Updated product images (${images.length} images)`)
+                } catch (imageUpdateError: any) {
+                  console.log(`   [DEBUG ${parentSKU}] ⚠️  Failed to update images: ${imageUpdateError.message}`)
+                  // Non-fatal error, continue
+                }
+              }
+              
               // All variants exist, product is complete
               variants = []
               // Load product with variants for inventory processing
