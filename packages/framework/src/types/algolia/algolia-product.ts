@@ -79,6 +79,7 @@ export const AlgoliaProductValidator = z.object({
       store_status: z.nativeEnum(StoreStatus).nullish(),
     })
     .nullable(),
+  min_price: z.number().nullable().optional(), // Minimum price among all variants for easier filtering
 });
 
 export const AlgoliaVariantValidator = z.object({
