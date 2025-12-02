@@ -180,7 +180,9 @@ export interface ParentGroup {
  */
 export function groupByParentSKU(rows: CSVRow[]): ParentGroup[] {
   const groups = new Map<string, ParentGroup>()
+  const parentRows = new Map<string, CSVRow>() // Store parent rows separately
   
+  // First pass: collect all rows and identify parent rows
   for (const row of rows) {
     let parentSKU = row[CSVColumn.PARENT_SKU]
     
@@ -189,26 +191,45 @@ export function groupByParentSKU(rows: CSVRow[]): ParentGroup[] {
       parentSKU = row[CSVColumn.SKU]
     }
     
+    // Store parent rows separately
+    if (row[CSVColumn.PARENTAGE_LEVEL] === ParentageLevel.PARENT) {
+      parentRows.set(parentSKU, row)
+    }
+    
     if (!groups.has(parentSKU)) {
       groups.set(parentSKU, {
         parentSKU,
-        parentRow: row, // will be updated if we find actual parent
+        parentRow: null as any, // Will be set from parentRows map
         childRows: []
       })
     }
     
     const group = groups.get(parentSKU)!
     
-    if (row[CSVColumn.PARENTAGE_LEVEL] === ParentageLevel.PARENT) {
-      // This is the parent row - use it as the main product info
-      group.parentRow = row
-    } else if (row[CSVColumn.PARENTAGE_LEVEL] === ParentageLevel.CHILD) {
+    if (row[CSVColumn.PARENTAGE_LEVEL] === ParentageLevel.CHILD) {
       // This is a child variant
       group.childRows.push(row)
     } else if (!row[CSVColumn.PARENTAGE_LEVEL] || row[CSVColumn.PARENTAGE_LEVEL].trim() === ParentageLevel.NONE) {
       // No parentage level specified - treat as both parent and child
-      group.parentRow = row
+      if (!parentRows.has(parentSKU)) {
+        parentRows.set(parentSKU, row)
+      }
       group.childRows.push(row)
+    }
+  }
+  
+  // Second pass: assign parent rows to groups (works regardless of order in CSV)
+  for (const [parentSKU, group] of groups.entries()) {
+    if (parentRows.has(parentSKU)) {
+      // Use the actual parent row
+      group.parentRow = parentRows.get(parentSKU)!
+      console.log(`[CSV Parser] ✓ Found parent row for ${parentSKU} (Product Type: "${group.parentRow[CSVColumn.PRODUCT_TYPE]}")`)
+    } else if (group.childRows.length > 0) {
+      // Fallback: use first child row as parent (shouldn't happen if CSV is correct)
+      console.warn(`[CSV Parser] ⚠️  No parent row found for ${parentSKU}, using first child row as parent`)
+      group.parentRow = group.childRows[0]
+    } else {
+      console.error(`[CSV Parser] ❌ No parent or child rows found for ${parentSKU}`)
     }
   }
   
@@ -234,6 +255,29 @@ export function extractQuantity(row: CSVRow): number {
 }
 
 /**
+ * Normalize image URL to ensure it's valid for Next.js Image component
+ * - If relative path (doesn't start with http:// or https://), add leading slash
+ * - If already absolute URL, return as-is
+ */
+function normalizeImageUrl(url: string): string {
+  if (!url || !url.trim()) return url
+  
+  const trimmed = url.trim()
+  
+  // If it's already an absolute URL, return as-is
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+  
+  // If it's a relative path, ensure it starts with /
+  if (!trimmed.startsWith('/')) {
+    return '/' + trimmed
+  }
+  
+  return trimmed
+}
+
+/**
  * Extract all images from row (Main + Image 2-9)
  */
 export function extractImages(row: CSVRow): string[] {
@@ -241,14 +285,20 @@ export function extractImages(row: CSVRow): string[] {
   
   // Main image
   if (row[CSVColumn.MAIN_IMAGE_URL]) {
-    images.push(row[CSVColumn.MAIN_IMAGE_URL])
+    const normalizedUrl = normalizeImageUrl(row[CSVColumn.MAIN_IMAGE_URL])
+    if (normalizedUrl) {
+      images.push(normalizedUrl)
+    }
   }
   
   // Additional images (Image 2-9)
   for (let i = 2; i <= 9; i++) {
     const imgKey = `Image ${i}`
     if (row[imgKey]) {
-      images.push(row[imgKey])
+      const normalizedUrl = normalizeImageUrl(row[imgKey])
+      if (normalizedUrl) {
+        images.push(normalizedUrl)
+      }
     }
   }
   

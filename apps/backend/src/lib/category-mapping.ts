@@ -97,46 +97,46 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'FASCIAS_&_SOFFITS': { level1: 'Building Materials', level2: 'Building Supplies', level3: 'Fascias & Soffits' },
   'RAW_MATERIALS': { level1: 'Building Materials', level2: 'Building Supplies', level3: 'Raw Materials' },
 
-  // Flooring & Tiling → Flooring Tools & Accessories
-  'RUG_PAD': { level1: 'Flooring & Tiling', level2: 'Flooring Tools & Accessories', level3: 'Rug Pad' },
-  'TEXTILE_DEODORIZER': { level1: 'Flooring & Tiling', level2: 'Flooring Tools & Accessories', level3: 'Textile Deodorizer' },
-  'WEATHER_STRIPPING': { level1: 'Flooring & Tiling', level2: 'Flooring Tools & Accessories', level3: 'Weather Stripping' },
 
-  // Flooring & Tiling → Vinyl
-  'VINYL': { level1: 'Flooring & Tiling', level2: 'Vinyl', level3: 'Vinyl' },
+  // Flooring and Tiling → Flooring Tools & Accessories
+  'RUG_PAD': { level1: 'Flooring and Tiling', level2: 'Flooring Tools & Accessories', level3: 'Rug Pad' },
+  'TEXTILE_DEODORIZER': { level1: 'Flooring and Tiling', level2: 'Flooring Tools & Accessories', level3: 'Textile Deodorizer' },
+  'WEATHER_STRIPPING': { level1: 'Flooring and Tiling', level2: 'Flooring Tools & Accessories', level3: 'Weather Stripping' },
 
-  // Flooring & Tiling → Carpet
-  'CARPETING': { level1: 'Flooring & Tiling', level2: 'Carpet', level3: 'Carpeting' },
+  // Flooring and Tiling → Vinyl
+  'VINYL': { level1: 'Flooring and Tiling', level2: 'Vinyl', level3: 'Vinyl' },
 
-  // Flooring & Tiling → Rugs
-  'RUG': { level1: 'Flooring & Tiling', level2: 'Rugs', level3: 'Rug' },
+  // Flooring and Tiling → Carpet
+  'CARPETING': { level1: 'Flooring and Tiling', level2: 'Carpet', level3: 'Carpeting' },
 
-  // Flooring & Tiling → Stair Runner
-  'STAIR_RUNNER': { level1: 'Flooring & Tiling', level2: 'Stair Runner', level3: 'Stair Runner' },
+  // Flooring and Tiling → Rugs
+  'RUG': { level1: 'Flooring and Tiling', level2: 'Rugs', level3: 'Rug' },
 
-  // Flooring & Tiling → Laminate
-  'LAMINATE': { level1: 'Flooring & Tiling', level2: 'Laminate', level3: 'Laminate' },
+  // Flooring and Tiling → Stair Runner
+  'STAIR_RUNNER': { level1: 'Flooring and Tiling', level2: 'Stair Runner', level3: 'Stair Runner' },
 
-  // Flooring & Tiling → LVT
-  'LVT': { level1: 'Flooring & Tiling', level2: 'LVT', level3: 'LVT' },
+  // Flooring and Tiling → Laminate
+  'LAMINATE': { level1: 'Flooring and Tiling', level2: 'Laminate', level3: 'Laminate' },
 
-  // Flooring & Tiling → Engineered Wood
-  'ENGINEERED_WOOD': { level1: 'Flooring & Tiling', level2: 'Engineered Wood', level3: 'Engineered Wood' },
+  // Flooring and Tiling → LVT
+  'LVT': { level1: 'Flooring and Tiling', level2: 'LVT', level3: 'LVT' },
 
-  // Flooring & Tiling → Tiles
-  'TILE': { level1: 'Flooring & Tiling', level2: 'Tiles', level3: 'Tile' },
+  // Flooring and Tiling → Engineered Wood
+  'ENGINEERED_WOOD': { level1: 'Flooring and Tiling', level2: 'Engineered Wood', level3: 'Engineered Wood' },
 
-  // Renewable & Energy → EV Charger
-  'EV_CHARGER': { level1: 'Renewable & Energy', level2: 'EV Charger', level3: 'EV Charger' },
+  // Flooring and Tiling → Tiles
+  'TILE': { level1: 'Flooring and Tiling', level2: 'Tiles', level3: 'Tile' },
+  // Renewable and Energy → EV Charger
+  'EV_CHARGER': { level1: 'Renewable and Energy', level2: 'EV Charger', level3: 'EV Charger' },
 
-  // Renewable & Energy → Solar
-  'SOLAR_PANELS': { level1: 'Renewable & Energy', level2: 'Solar', level3: 'Solar Panels' },
+  // Renewable and Energy → Solar
+  'SOLAR_PANELS': { level1: 'Renewable and Energy', level2: 'Solar', level3: 'Solar Panels' },
   
-  // Renewable & Energy → Solar Battery
-  'BATTERY_STORAGE': { level1: 'Renewable & Energy', level2: 'Solar Battery', level3: 'Battery Storage' },
+  // Renewable and Energy → Solar Battery
+  'BATTERY_STORAGE': { level1: 'Renewable and Energy', level2: 'Solar Battery', level3: 'Battery Storage' },
 
-  // Electrical & Lighting → Fans & Air Conditioning Units
-  'AIR_CONDITIONERS': { level1: 'Electrical & Lighting', level2: 'Fans & Air Conditioning Units', level3: 'Air Conditioners' },
+  // Electrical and Lighting → Fans & Air Conditioning Units
+  'AIR_CONDITIONERS': { level1: 'Electrical and Lighting', level2: 'Fans & Air Conditioning Units', level3: 'Air Conditioners' },
 
   // Heating and Plumbing → Boilers
   'BOILERS': { level1: 'Heating and Plumbing', level2: 'Boilers', level3: 'Boilers' },
@@ -163,13 +163,13 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'PAVING_&_WALLING': { level1: 'Gardens and Landscaping', level2: 'Driveways & Paving', level3: 'Paving & Walling' },
 
   // Doors and Windows → Internal Doors
-  'FIRE_RATED_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Fire Rated Doors' },
-  'OAK_INTERNAL_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Oak Internal Doors' },
-  'PLYWOOD_FLUSH_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Plywood Flush Doors' },
-  'PANEL_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Panel Doors' },
+  // 'FIRE_RATED_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Fire Rated Doors' },
+  // 'OAK_INTERNAL_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Oak Internal Doors' },
+  // 'PLYWOOD_FLUSH_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Plywood Flush Doors' },
+  // 'PANEL_DOORS': { level1: 'Doors and Windows', level2: 'Internal Doors', level3: 'Panel Doors' },
 
   // Doors and Windows → External Doors
-  'EXTERNAL_FIRE_RATED_DOORS': { level1: 'Doors and Windows', level2: 'External Doors', level3: 'External Fire Rated Doors' },
+  // 'EXTERNAL_FIRE_RATED_DOORS': { level1: 'Doors and Windows', level2: 'External Doors', level3: 'External Fire Rated Doors' },
 
   // Doors and Windows → Skirting & Architrave
   'ARCHITRAVES': { level1: 'Doors and Windows', level2: 'Skirting & Architrave', level3: 'Architraves' },
@@ -179,19 +179,20 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'WINDOW_BOARDS': { level1: 'Doors and Windows', level2: 'Windows', level3: 'Window Boards' },
 
   // Doors and Windows → Door Frames
-  'INTERNAL_DOOR_FRAMES': { level1: 'Doors and Windows', level2: 'Door Frames', level3: 'Internal Door Frames' },
+  // 'INTERNAL_DOOR_FRAMES': { level1: 'Doors and Windows', level2: 'Door Frames', level3: 'Internal Door Frames' },
 }
 
 /**
  * Get category hierarchy for a product type
  */
 export function getCategoryForProductType(productType: string) {
-  const mapping = PRODUCT_TYPE_TO_CATEGORY[productType]
-  
-  if (!mapping) {
+  if (!productType) {
     return null
   }
   
-  return mapping
+  // Exact match only
+  const mapping = PRODUCT_TYPE_TO_CATEGORY[productType]
+  
+  return mapping || null
 }
 
