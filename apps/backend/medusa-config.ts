@@ -104,11 +104,14 @@ module.exports = defineConfig({
             resolve: "@medusajs/medusa/notification-local",
             id: "local",
             options: {
-              channels: ["feed", "seller_feed"],
-            },
-          },
-        ],
-      },
+              channels: ['feed', 'seller_feed']
+            }
+          }
+        ]
+      }
     },
-  ],
-});
+    {
+      resolve: '@medusajs/index'
+    }
+  ]
+})
