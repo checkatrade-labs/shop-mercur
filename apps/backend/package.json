@@ -46,7 +46,6 @@
     "@medusajs/medusa": "2.11.3",
     "@mercurjs/commission": "*",
     "@mercurjs/requests": "*",
-    "@mercurjs/resend": "*",
     "@mercurjs/reviews": "*",
     "@mercurjs/stripe-tax-provider": "*",
     "@mercurjs/payment-stripe-connect": "*",

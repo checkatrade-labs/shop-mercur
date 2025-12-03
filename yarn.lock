@@ -3426,13 +3426,6 @@
   resolved "https://registry.yarnpkg.com/mercurjs-framework/-/mercurjs-framework-1.4.6.tgz#4d9b3551271375e0d98e2124897b8b40d725a065"
   integrity sha512-0R0wJ7QcTRC12Y7eQvRo9RvbOx5vemoueOrCpwUEsDYL562s8Ewd3qn9q5AEzmCGsRdCYdYT7En7JDRh18iHog==
 
-"@mercurjs/resend@*":
-  version "1.4.4"
-  resolved "https://registry.yarnpkg.com/@mercurjs/resend/-/resend-1.4.4.tgz#f0eaafebb2d3d6e59ba9cf838158f32e621a0b11"
-  integrity sha512-QxA4JkGBTpvGr+VEMfOQgWXV6M5R0vp0LLGl281D11Y/UY8uaMG2cljsEAhs36fNpE/goKBbujljObugbdU6Qg==
-  dependencies:
-    resend "^4.1.2"
-
 "@mikro-orm/cli@6.4.16":
   version "6.4.16"
   resolved "https://registry.yarnpkg.com/@mikro-orm/cli/-/cli-6.4.16.tgz#818a572f680583fb9a444f6a4181199578c3382a"
