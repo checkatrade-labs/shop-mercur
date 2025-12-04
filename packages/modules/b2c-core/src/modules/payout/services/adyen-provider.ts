@@ -177,7 +177,6 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         );
       }
 
-
       // TODO: Uncomment this later
       // legalEntity =
       //   await this.legalEntityApi_.LegalEntitiesApi.createLegalEntity({
