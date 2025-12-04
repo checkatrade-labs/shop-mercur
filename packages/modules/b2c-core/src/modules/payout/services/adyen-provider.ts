@@ -177,16 +177,62 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         );
       }
 
+
+      // TODO: Uncomment this later
+      // legalEntity =
+      //   await this.legalEntityApi_.LegalEntitiesApi.createLegalEntity({
+      //     type: LegalEntityInfoRequiredType.TypeEnum.Organization,
+      //     reference: account_id,
+      //     organization: {
+      //       legalName: context.legal_name as string,
+      //       description: `Legal entity for ${context.legal_name as string} on account ${account_id}`,
+      //       phone: {
+      //         phoneCountryCode: context.country as string,
+      //         number: context.phone_number as string,
+      //         type: "mobile",
+      //       },
+      //       registeredAddress: {
+      //         country: context.country as string,
+      //         city: context.city as string,
+      //         postalCode: context.postal_code as string,
+      //         street: context.street as string,
+      //         street2: context.street2 as string,
+      //       },
+      //     },
+      //   });
+      // this.logger_.info(`[Adyen] Legal entity created: ${legalEntity.id}`);
+
+      // accountHolder =
+      //   await this.balancePlatformApi_.AccountHoldersApi.createAccountHolder({
+      //     legalEntityId: legalEntity.id,
+      //     description: `Account holder for ${context.legal_name as string}`,
+      //     reference: account_id,
+      //     // NOTE: We can request capabilities if needed, but it's not required for now.
+      //     // capabilities: {},
+      //   });
+      // this.logger_.info(`[Adyen] Account holder created: ${accountHolder.id}`);
+
+      // balanceAccount =
+      //   await this.balancePlatformApi_.BalanceAccountsApi.createBalanceAccount({
+      //     accountHolderId: accountHolder.id!,
+      //     description: `Balance account for ${context.legal_name as string}`,
+      //     reference: account_id,
+      //   });
+      // this.logger_.info(
+      //   `[Adyen] Balance account created: ${balanceAccount.id}`
+      // );
+
+      // TODO: Remove this CAT Shop merchant temporary fix later.
       legalEntity =
-        await this.legalEntityApi_.LegalEntitiesApi.getLegalEntity("LE322JV223224Z5KDKSKM89K2");
+        await this.legalEntityApi_.LegalEntitiesApi.getLegalEntity(process.env.TEMP_ADYEN_LEGAL_ENTITY_ID as string);
       this.logger_.info(`[Adyen] Legal entity get: ${legalEntity.id}`);
 
       accountHolder =
-        await this.balancePlatformApi_.AccountHoldersApi.getAccountHolder("AH3222Z223226P5KDKSKN32MN");
+        await this.balancePlatformApi_.AccountHoldersApi.getAccountHolder(process.env.TEMP_ADYEN_ACCOUNT_HOLDER_ID as string);
       this.logger_.info(`[Adyen] Account holder get: ${accountHolder.id}`);
 
       balanceAccount =
-        await this.balancePlatformApi_.BalanceAccountsApi.getBalanceAccount("BA3222Z223226P5KDKSKN32NS");
+        await this.balancePlatformApi_.BalanceAccountsApi.getBalanceAccount(process.env.TEMP_ADYEN_BALANCE_ACCOUNT_ID as string);
       this.logger_.info(
         `[Adyen] Balance account get: ${balanceAccount.id}`
       );
