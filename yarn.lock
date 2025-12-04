@@ -2791,9 +2791,6 @@
     "@medusajs/utils" "2.11.3"
     ulid "^2.3.0"
 
-"@mercurjs/framework@file:packages/modules/b2c-core/.yalc/@mercurjs/framework":
-  version "1.4.6"
-
 "@mikro-orm/cli@6.4.16":
   version "6.4.16"
   resolved "https://registry.yarnpkg.com/@mikro-orm/cli/-/cli-6.4.16.tgz#818a572f680583fb9a444f6a4181199578c3382a"

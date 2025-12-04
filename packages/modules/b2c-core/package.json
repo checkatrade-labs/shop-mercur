@@ -43,7 +43,7 @@
     "@medusajs/medusa": "2.11.3",
     "@medusajs/test-utils": "2.11.3",
     "@medusajs/ui": "4.0.25",
-    "@mercurjs/framework": "file:.yalc/@mercurjs/framework",
+    "@mercurjs/framework": "*",
     "@swc/core": "1.5.7",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.2",
