@@ -29,27 +29,27 @@
     "generate:oas": "medusa-oas oas --type combined --paths ./src/api"
   },
   "dependencies": {
+    "@medusajs/admin-sdk": "2.11.3",
+    "@medusajs/cli": "2.11.3",
+    "@medusajs/framework": "2.11.3",
+    "@medusajs/index": "2.11.3",
+    "@medusajs/medusa": "2.11.3",
     "@mercurjs/algolia": "*",
-    "@mercurjs/b2c-core": "*",
+    "@mercurjs/b2c-core": "file:.yalc/@mercurjs/b2c-core",
+    "@mercurjs/commission": "*",
     "@mercurjs/framework": "*",
+    "@mercurjs/payment-stripe-connect": "*",
+    "@mercurjs/requests": "*",
     "@mercurjs/resend": "*",
+    "@mercurjs/reviews": "*",
+    "@mercurjs/stripe-tax-provider": "*",
+    "@talkjs/react": "^0.1.11",
+    "algoliasearch": "^5.20.2",
     "csv-parse": "^6.1.0",
     "csv-parser": "^3.0.0",
     "mercurjs-payment-adyen-connect": "*",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.13.0",
-    "@medusajs/index": "2.11.3",
-    "@medusajs/admin-sdk": "2.11.3",
-    "@medusajs/cli": "2.11.3",
-    "@medusajs/framework": "2.11.3",
-    "@medusajs/medusa": "2.11.3",
-    "@mercurjs/commission": "*",
-    "@mercurjs/requests": "*",
-    "@mercurjs/reviews": "*",
-    "@mercurjs/stripe-tax-provider": "*",
-    "@mercurjs/payment-stripe-connect": "*",
-    "@talkjs/react": "^0.1.11",
-    "algoliasearch": "^5.20.2",
     "resend": "^4.1.2",
     "stripe": "^17.4.0",
     "talkjs": "^0.38.0"
@@ -83,4 +83,3 @@
     "node": ">=20"
   }
 }
-
