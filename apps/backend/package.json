@@ -30,10 +30,9 @@
   },
   "dependencies": {
     "@mercurjs/algolia": "*",
-    "@mercurjs/b2c-core": "npm:mercurjs-b2c-core@*",
-    "@mercurjs/framework": "npm:mercurjs-framework@*",
-    "mercurjs-resend": "*",
-    "awilix": "^8.0.1",
+    "@mercurjs/b2c-core": "*",
+    "@mercurjs/framework": "*",
+    "@mercurjs/resend": "*",
     "csv-parse": "^6.1.0",
     "csv-parser": "^3.0.0",
     "mercurjs-payment-adyen-connect": "*",

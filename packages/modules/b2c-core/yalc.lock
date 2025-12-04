@@ -1,0 +1,10 @@
+{
+  "version": "v1",
+  "packages": {
+    "@mercurjs/framework": {
+      "signature": "edcf4e10874ac0c4a380707a1e0783e1",
+      "file": true,
+      "replaced": "*"
+    }
+  }
+}
