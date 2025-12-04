@@ -141,14 +141,12 @@ class PayoutModuleService extends MedusaService({
         account_data as unknown as Types.legalEntityManagement.LegalEntity;
 
       const hasPayoutCapability =
-        adyen_entity.capabilities?.sendToTransferInstrument.allowed === true &&
-        adyen_entity.capabilities?.receiveFromTransferInstrument.allowed ===
+        adyen_entity.capabilities?.sendToTransferInstrument?.allowed === true &&
+        adyen_entity.capabilities?.sendToBalanceAccount?.allowed === true &&
+        adyen_entity.capabilities?.receivePayments?.allowed === true &&
+        adyen_entity.capabilities?.receiveFromPlatformPayments?.allowed ===
           true &&
-        adyen_entity.capabilities?.sendToBalanceAccount.allowed === true &&
-        adyen_entity.capabilities?.receivePayments.allowed === true &&
-        adyen_entity.capabilities?.receiveFromPlatformPayments.allowed ===
-          true &&
-        adyen_entity.capabilities?.receiveFromBalanceAccount.allowed === true;
+        adyen_entity.capabilities?.receiveFromBalanceAccount?.allowed === true;
 
       status = hasPayoutCapability
         ? PayoutAccountStatus.ACTIVE
