@@ -2791,25 +2791,8 @@
     "@medusajs/utils" "2.11.3"
     ulid "^2.3.0"
 
-"@mercurjs/b2c-core@*":
-  version "1.4.4"
-  resolved "https://registry.yarnpkg.com/@mercurjs/b2c-core/-/b2c-core-1.4.4.tgz#15157b801c9335a19e5789c7d8205f95362493d4"
-  integrity sha512-DnnmkB4R27tbtaKSxW68NgoC8QR1dDR0twxEQ4AYyBBB1HCe/qwhsHHDFTL/+n+n9mHZ4E6HtmtImQ9liKKb8Q==
-
-"@mercurjs/framework@*":
-  version "1.4.4"
-  resolved "https://registry.yarnpkg.com/@mercurjs/framework/-/framework-1.4.4.tgz#56c3139e912b3ef2129ccc221904a1c7d9c30618"
-  integrity sha512-nmbRWBZl4DIZabXCfIq6LNEbeEpVmJ66fSm/a2EXlz/yMrCzlz46IWwBtw2GwiICgzBhPMHn/mxaPbgDdtgzxQ==
-
 "@mercurjs/framework@file:packages/modules/b2c-core/.yalc/@mercurjs/framework":
   version "1.4.6"
-
-"@mercurjs/resend@*":
-  version "1.4.4"
-  resolved "https://registry.yarnpkg.com/@mercurjs/resend/-/resend-1.4.4.tgz#f0eaafebb2d3d6e59ba9cf838158f32e621a0b11"
-  integrity sha512-QxA4JkGBTpvGr+VEMfOQgWXV6M5R0vp0LLGl281D11Y/UY8uaMG2cljsEAhs36fNpE/goKBbujljObugbdU6Qg==
-  dependencies:
-    resend "^4.1.2"
 
 "@mikro-orm/cli@6.4.16":
   version "6.4.16"
