@@ -319,27 +319,27 @@ export class AdyenPayoutProvider implements IPayoutProvider {
         this.logger_.info("[Adyen] Deleted business line");
       }
 
-      if (balanceAccount && balanceAccount.id) {
-        await this.balancePlatformApi_.BalanceAccountsApi.updateBalanceAccount(
-          balanceAccount.id,
-          {
-            status: Types.balancePlatform.BalanceAccount.StatusEnum.Closed,
-          }
-        );
+      // if (balanceAccount && balanceAccount.id) {
+      //   await this.balancePlatformApi_.BalanceAccountsApi.updateBalanceAccount(
+      //     balanceAccount.id,
+      //     {
+      //       status: Types.balancePlatform.BalanceAccount.StatusEnum.Closed,
+      //     }
+      //   );
 
-        this.logger_.info("[Adyen] Closed balance account");
-      }
+      //   this.logger_.info("[Adyen] Closed balance account");
+      // }
 
-      if (accountHolder && accountHolder.id) {
-        await this.balancePlatformApi_.AccountHoldersApi.updateAccountHolder(
-          accountHolder.id,
-          {
-            status: Types.balancePlatform.AccountHolder.StatusEnum.Closed,
-          }
-        );
+      // if (accountHolder && accountHolder.id) {
+      //   await this.balancePlatformApi_.AccountHoldersApi.updateAccountHolder(
+      //     accountHolder.id,
+      //     {
+      //       status: Types.balancePlatform.AccountHolder.StatusEnum.Closed,
+      //     }
+      //   );
 
-        this.logger_.info("[Adyen] Closed account holder");
-      }
+      //   this.logger_.info("[Adyen] Closed account holder");
+      // }
 
       const message =
         error?.message ?? "Error occurred while creating Adyen payout account";
