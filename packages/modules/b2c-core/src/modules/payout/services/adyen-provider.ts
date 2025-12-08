@@ -235,7 +235,7 @@ export class AdyenPayoutProvider implements IPayoutProvider {
       store = await this.managementApi_.AccountStoreLevelApi.createStore({
         merchantId: this.config_.adyenMerchantAccount,
         businessLineIds: [businessLine.id],
-        description: `Store for ${context.legal_name as string}`,
+        description: `Cat Shop Store for ${context.legal_name as string}`,
         address: {
           country: context.country as string,
           city: context.city as string,

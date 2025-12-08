@@ -138,8 +138,14 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   // Electrical and Lighting → Fans & Air Conditioning Units
   'AIR_CONDITIONERS': { level1: 'Electrical and Lighting', level2: 'Fans & Air Conditioning Units', level3: 'Air Conditioners' },
 
+  // Heating and Plumbing → Boilers Supply & Fit
+  'BOILERS_SUPPLY_&_FIT': { level1: 'Heating and Plumbing', level2: 'Boilers Supply & Fit', level3: 'Boilers Supply & Fit' },
+
+  // Heating and Plumbing → Boilers & Boiler Packs
+  'BOILERS_&_BOILER_PACKS': { level1: 'Heating and Plumbing', level2: 'Boilers & Boiler Packs', level3: 'Boilers & Boiler Packs' },
+
   // Heating and Plumbing → Boilers
-  'BOILERS': { level1: 'Heating and Plumbing', level2: 'Boilers', level3: 'Boilers' },
+  'BOILER_FLUES_&_ACCESSORIES': { level1: 'Heating and Plumbing', level2: 'Boiler Flues & Accessories', level3: 'Boiler Flues & Accessories' },
 
   // Gardens and Landscaping → Garden Supplies
   'PLANT_SEED': { level1: 'Gardens and Landscaping', level2: 'Garden Supplies', level3: 'Plant Seed' },
