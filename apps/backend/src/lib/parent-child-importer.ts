@@ -56,7 +56,28 @@ export async function importParentGroup(
     const productTitle = parentRow[CSVColumn.TITLE] || 
                         parentRow[CSVColumn.ITEM_NAME] || 
                         `Product ${parentSKU}`
-    const productDescription = parentRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
+    
+    let productDescription = parentRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
+    
+    if (!productDescription || productDescription.trim().length === 0) {
+      if (childRows.length > 0) {
+        // Try first child row
+        const firstChildDesc = childRows[0][CSVColumn.PRODUCT_DESCRIPTION] || ''
+        if (firstChildDesc && firstChildDesc.trim().length > 0) {
+          productDescription = firstChildDesc
+        } else {
+          // Try all child rows
+          for (let i = 0; i < childRows.length; i++) {
+            const childDesc = childRows[i][CSVColumn.PRODUCT_DESCRIPTION] || ''
+            if (childDesc && childDesc.trim().length > 0) {
+              productDescription = childDesc
+              break
+            }
+          }
+        }
+      }
+    }
+    
     console.log(`   [DEBUG ${parentSKU}] Product title: "${productTitle}" (from parent row)`)
 
     // 3. Get category mapping for this product type
@@ -271,6 +292,13 @@ export async function importParentGroup(
       // Extract all variant metadata using helper function
       const metadata = extractVariantMetadata(childRow)
       
+      // Add product description to variant metadata (from parent or child row)
+      // This ensures description is available at variant level even if product description is empty
+      const variantDescription = childRow[CSVColumn.PRODUCT_DESCRIPTION] || productDescription || ''
+      if (variantDescription && variantDescription.trim().length > 0) {
+        metadata.product_description = variantDescription
+      }
+      
       // Extract variant-specific images and save to metadata
       const variantImages = extractImages(childRow)
       if (variantImages.length > 0) {
@@ -422,6 +450,25 @@ export async function importParentGroup(
       product = existingProduct
       productId = product.id
       console.log(`   [DEBUG ${parentSKU}] ⚠️  Product with handle "${handle}" already exists (ID: ${productId}), skipping creation`)
+      
+      // Update description for existing product if we have a new description
+      if (productDescription && productDescription.trim().length > 0) {
+        try {
+          const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+          await updateProductsWorkflow(scope).run({
+            input: {
+              selector: { id: productId },
+              update: {
+                description: productDescription,
+              }
+            }
+          })
+          console.log(`   [DEBUG ${parentSKU}] ✓ Updated product description (length: ${productDescription.length})`)
+        } catch (descUpdateError: any) {
+          console.log(`   [DEBUG ${parentSKU}] ⚠️  Failed to update description: ${descUpdateError.message}`)
+          // Non-fatal error, continue
+        }
+      }
       
       // Update images for existing product if we have new images
       if (images.length > 0) {
@@ -583,6 +630,7 @@ export async function importParentGroup(
     if (!product) {
       console.log(`   [DEBUG ${parentSKU}] Creating product with ${variants.length} variants, ${productOptions.length} options`)
       console.log(`   [DEBUG ${parentSKU}] Handle: "${handle}", Category ID: ${leafCategory.id}, Type ID: ${productTypeId || 'none'}`)
+      console.log(`   [DEBUG ${parentSKU}] Product description being sent to workflow: length=${productDescription.length}${productDescription.length > 0 ? `, value="${productDescription.substring(0, 150)}${productDescription.length > 150 ? '...' : ''}"` : ' (EMPTY - will be empty in DB!)'}`)
       
       try {
         const { result } = await createProductsWorkflow(scope).run({
@@ -615,6 +663,32 @@ export async function importParentGroup(
         product = result[0]
         productId = product.id
         console.log(`   [DEBUG ${parentSKU}] ✓ Product created successfully: ${productId}`)
+        
+        // Verify description was saved
+        if (productDescription && productDescription.trim().length > 0) {
+          const savedDescription = product.description || ''
+          console.log(`   [DEBUG ${parentSKU}] Description verification: input length=${productDescription.length}, saved length=${savedDescription.length}`)
+          if (savedDescription.length === 0) {
+            console.error(`   [DEBUG ${parentSKU}] ❌ WARNING: Description was NOT saved! Input had ${productDescription.length} characters but saved description is empty.`)
+            // Try to update it manually
+            try {
+              const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+              await updateProductsWorkflow(scope).run({
+                input: {
+                  selector: { id: productId },
+                  update: {
+                    description: productDescription,
+                  }
+                }
+              })
+              console.log(`   [DEBUG ${parentSKU}] ✓ Manually updated product description after creation`)
+            } catch (updateError: any) {
+              console.error(`   [DEBUG ${parentSKU}] ❌ Failed to manually update description: ${updateError.message}`)
+            }
+          } else {
+            console.log(`   [DEBUG ${parentSKU}] ✓ Description saved successfully`)
+          }
+        }
       } catch (workflowError: any) {
         // Check if error is due to existing product/variant
         if (workflowError.message?.includes('already exists') || 
