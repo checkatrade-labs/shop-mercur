@@ -171,17 +171,17 @@ export async function findAndTransformAlgoliaProducts(
   })
 
   for (const product of products) {
+    // Remove description immediately - not needed for Algolia search and saves significant space
+    if ((product as any).description !== undefined) {
+      delete (product as any).description;
+    }
+
     product.average_rating = 0;
     product.supported_countries = await selectProductVariantsSupportedCountries(
       container,
       product.id
     );
     product.seller = await selectProductSeller(container, product.id);
-
-    // Trim description to 500 characters to reduce size
-    if (product.description && product.description.length > 500) {
-      product.description = product.description.substring(0, 500) + '...';
-    }
 
     // Transform options to simple key-value pairs
     product.options = product.options
