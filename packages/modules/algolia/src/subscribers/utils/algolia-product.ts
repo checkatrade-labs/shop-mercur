@@ -126,7 +126,6 @@ export async function findAndTransformAlgoliaProducts(
       'id',
       'title',
       'subtitle',
-      'description',
       'handle',
       'thumbnail',
       'status',
@@ -171,10 +170,6 @@ export async function findAndTransformAlgoliaProducts(
   })
 
   for (const product of products) {
-    // Remove description immediately - not needed for Algolia search and saves significant space
-    if ((product as any).description !== undefined) {
-      delete (product as any).description;
-    }
 
     product.average_rating = 0;
     product.supported_countries = await selectProductVariantsSupportedCountries(
