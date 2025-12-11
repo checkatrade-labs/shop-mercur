@@ -292,11 +292,19 @@ export async function importParentGroup(
       // Extract all variant metadata using helper function
       const metadata = extractVariantMetadata(childRow)
       
-      // Add product description to variant metadata (from parent or child row)
-      // This ensures description is available at variant level even if product description is empty
-      const variantDescription = childRow[CSVColumn.PRODUCT_DESCRIPTION] || productDescription || ''
+      // Only save variant description to metadata if it exists AND differs from parent description
+      const variantDescription = childRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
+      const parentDescription = productDescription || ''
+      
       if (variantDescription && variantDescription.trim().length > 0) {
-        metadata.product_description = variantDescription
+        const variantDescTrimmed = variantDescription.trim()
+        const parentDescTrimmed = parentDescription.trim()
+        
+        // Only save if variant description is different from parent description
+        if (variantDescTrimmed !== parentDescTrimmed) {
+          metadata.product_description = variantDescTrimmed
+        }
+        // If they're the same, don't set metadata.product_description (keep it empty)
       }
       
       // Extract variant-specific images and save to metadata
