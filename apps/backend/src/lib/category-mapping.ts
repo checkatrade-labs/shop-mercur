@@ -186,6 +186,24 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
 
   // Doors and Windows → Door Frames
   // 'INTERNAL_DOOR_FRAMES': { level1: 'Doors and Windows', level2: 'Door Frames', level3: 'Internal Door Frames' },
+
+  'CABINETS_AND_STORAGE': { level1: '', level2: '', level3: '' },
+  'SHOWERS': { level1: '', level2: '', level3: '' },
+  'SHOWER_ACCESSORIES': { level1: '', level2: '', level3: '' },
+  'BATH_TAPS': { level1: '', level2: '', level3: '' },
+  'BATHROOM_TAPS': { level1: '', level2: '', level3: '' },
+  'BIDET_TAPS': { level1: '', level2: '', level3: '' },
+  'BASIN_TAPS': { level1: '', level2: '', level3: '' },
+  'TAP_WASHERS_AND_REPAIRS': { level1: '', level2: '', level3: '' },
+  'WASTE_&_TRAPS': { level1: '', level2: '', level3: '' },
+  'BATHROOM_FITTINGS': { level1: '', level2: '', level3: '' },
+  'BATHROOM_MIRRORS': { level1: '', level2: '', level3: '' },
+  'BATHROOM_ACCESSORIES': { level1: '', level2: '', level3: '' },
+  'KITCHEN_SINK_&_TAP_SET': { level1: '', level2: '', level3: '' },
+  'KITCHEN_SINK': { level1: '', level2: '', level3: '' },
+  'KITCHEN_MIXER_TAP': { level1: '', level2: '', level3: '' },
+  'FILTER_KITCHEN_TAP': { level1: '', level2: '', level3: '' },
+  'KITCHEN_SINK_ACCESSORIES': { level1: '', level2: '', level3: '' },
 }
 
 /**
