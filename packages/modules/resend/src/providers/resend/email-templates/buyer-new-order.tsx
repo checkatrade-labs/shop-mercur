@@ -48,29 +48,7 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
         Hi {data.user_name},<br />
         Thanks for shopping with Checkatrade Shop.
       </p>
-      <div style={{ marginBottom: 24 }}>
-        <a
-          href={data.order_address}
-          style={{
-            display: 'inline-block',
-            padding: '10px 24px',
-            backgroundColor: '#FF3F3F',
-            color: '#ffffff',
-            borderRadius: '6px',
-            textDecoration: 'none',
-            fontWeight: 600,
-            marginBottom: 8,
-            border: 'none'
-          }}
-        >
-          Order details
-        </a>
-        <div style={{ fontSize: 13, color: '#040154', marginTop: 8, opacity: 0.7 }}>
-          If you can't click the button, here's your link: <br />
-          <span style={{ color: '#606FFF' }}>{data.order_address}</span>
-        </div>
-      </div>
-      <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order summary:</h3>
+      <h3 style={{ marginTop: 24, marginBottom: 12 }}>Order summary:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
         <thead>
           <tr>
