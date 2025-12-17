@@ -51,7 +51,7 @@ export default async function sellerProductRequestAcceptedHandler({
     channel: "email",
     template: ResendNotificationTemplates.SELLER_PRODUCT_APPROVED,
     content: {
-      subject: "Mercur - Product approved!",
+      subject: "Your product has been approved",
     },
     data: { data: { product_title: productRequest.data.title } },
   });

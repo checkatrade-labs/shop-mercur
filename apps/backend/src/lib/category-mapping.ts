@@ -186,6 +186,24 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
 
   // Doors and Windows → Door Frames
   // 'INTERNAL_DOOR_FRAMES': { level1: 'Doors and Windows', level2: 'Door Frames', level3: 'Internal Door Frames' },
+
+  'CABINETS_AND_STORAGE': { level1: 'Bathrooms', level2: 'Bathroom Furniture', level3: 'Cabinets and Storage' },
+  'SHOWERS': { level1: 'Bathrooms', level2: 'Showering', level3: 'Showers' },
+  'SHOWER_ACCESSORIES': { level1: 'Bathrooms', level2: 'Showering', level3: 'Shower Accessories' },
+  'BATH_TAPS': { level1: 'Bathrooms', level2: 'Taps', level3: 'Bath Taps' },
+  'BATHROOM_TAPS': { level1: 'Bathrooms', level2: 'Taps', level3: 'Bathroom Taps' },
+  'BIDET_TAPS': { level1: 'Bathrooms', level2: 'Taps', level3: 'Bidet Taps' },
+  'BASIN_TAPS': { level1: 'Bathrooms', level2: 'Taps', level3: 'Basin Taps' },
+  'TAP_WASHERS_AND_REPAIRS': { level1: 'Bathrooms', level2: 'Taps', level3: 'Tap Washers and Repairs' },
+  'WASTE_&_TRAPS': { level1: 'Bathrooms', level2: 'Bathroom Fittings', level3: 'Waste & Traps' },
+  'BATHROOM_FITTINGS': { level1: 'Bathrooms', level2: 'Bathroom Fittings', level3: 'Bathroom Fitting' },
+  'BATHROOM_MIRRORS': { level1: 'Bathrooms', level2: 'Accessories', level3: 'Bathroom Mirrors' },
+  'BATHROOM_ACCESSORIES': { level1: 'Bathrooms', level2: 'Accessories', level3: 'Bathroom Accessories' },
+  'KITCHEN_SINK_&_TAP_SET': { level1: 'Kitchen', level2: 'Sinks & Taps', level3: 'Kitchen Sink & Tap Set' },
+  'KITCHEN_SINK': { level1: 'Kitchen', level2: 'Kitchen Sinks', level3: 'Kitchen Sink' },
+  'KITCHEN_MIXER_TAP': { level1: 'Kitchen', level2: 'Kitchen Taps', level3: 'Kitchen Mixer Tap' },
+  'FILTER_KITCHEN_TAP': { level1: 'Kitchen', level2: 'Kitchen Taps', level3: 'Filter Kitchen Tap' },
+  'KITCHEN_SINK_ACCESSORIES': { level1: 'Kitchen', level2: 'Sink Accessories', level3: 'Kitchen Sink Accessories' },
 }
 
 /**

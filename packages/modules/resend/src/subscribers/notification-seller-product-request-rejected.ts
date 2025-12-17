@@ -44,7 +44,7 @@ export default async function sellerProductRequestRejectedHandler({
     channel: "email",
     template: ResendNotificationTemplates.SELLER_PRODUCT_REJECTED,
     content: {
-      subject: "Mercur - Product rejected!",
+      subject: "Your product has been rejected",
     },
     data: { data: { product_title: productRequest.data.title } },
   });
