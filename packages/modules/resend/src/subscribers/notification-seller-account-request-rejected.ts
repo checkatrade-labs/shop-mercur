@@ -22,7 +22,7 @@ export default async function sellerRequestRejectedHandler({
     channel: "email",
     template: ResendNotificationTemplates.SELLER_ACCOUNT_UPDATES_REJECTION,
     content: {
-      subject: "Mercur - Seller account rejected!",
+      subject: "Your seller account has been rejected",
     },
   });
 }
