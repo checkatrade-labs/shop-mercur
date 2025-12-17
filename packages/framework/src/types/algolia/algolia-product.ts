@@ -7,7 +7,7 @@ export const AlgoliaProductValidator = z.object({
   title: z.string(),
   handle: z.string(),
   subtitle: z.string().nullable(),
-  description: z.string().nullable(),
+  description: z.string().nullable().optional(),
   thumbnail: z.string().nullable(),
   average_rating: z.coerce.number().nullable().default(null),
   supported_countries: z.array(z.string()).nullable().default([]),
@@ -44,7 +44,7 @@ export const AlgoliaProductValidator = z.object({
   categories: z
     .array(
       z.object({
-        name: z.string(),
+        name: z.string().optional(),
         id: z.string(),
       })
     )
