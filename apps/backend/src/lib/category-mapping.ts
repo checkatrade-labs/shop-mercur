@@ -199,11 +199,16 @@ export const PRODUCT_TYPE_TO_CATEGORY: Record<string, {
   'BATHROOM_FITTINGS': { level1: 'Bathrooms', level2: 'Bathroom Fittings', level3: 'Bathroom Fitting' },
   'BATHROOM_MIRRORS': { level1: 'Bathrooms', level2: 'Accessories', level3: 'Bathroom Mirrors' },
   'BATHROOM_ACCESSORIES': { level1: 'Bathrooms', level2: 'Accessories', level3: 'Bathroom Accessories' },
-  'KITCHEN_SINK_&_TAP_SET': { level1: 'Kitchen', level2: 'Sinks & Taps', level3: 'Kitchen Sink & Tap Set' },
+  'KITCHEN_SINK_AND_TAP_SET': { level1: 'Kitchen', level2: 'Sinks & Taps', level3: 'Kitchen Sink & Tap Set' },
   'KITCHEN_SINK': { level1: 'Kitchen', level2: 'Kitchen Sinks', level3: 'Kitchen Sink' },
   'KITCHEN_MIXER_TAP': { level1: 'Kitchen', level2: 'Kitchen Taps', level3: 'Kitchen Mixer Tap' },
   'FILTER_KITCHEN_TAP': { level1: 'Kitchen', level2: 'Kitchen Taps', level3: 'Filter Kitchen Tap' },
   'KITCHEN_SINK_ACCESSORIES': { level1: 'Kitchen', level2: 'Sink Accessories', level3: 'Kitchen Sink Accessories' },
+
+  // Home & Furniture → Furniture
+  'BED_FRAMES': { level1: 'Home & Furniture', level2: 'Furniture', level3: 'Bed Frames' },
+  'BUNK_BEDS': { level1: 'Home & Furniture', level2: 'Furniture', level3: 'Bunk Beds' },
+  'MATTRESSES': { level1: 'Home & Furniture', level2: 'Furniture', level3: 'Mattresses' },
 }
 
 /**
