@@ -22,7 +22,7 @@ export default async function sellerRequestAcceptedHandler({
     channel: "email",
     template: ResendNotificationTemplates.SELLER_ACCOUNT_UPDATES_APPROVAL,
     content: {
-      subject: "Mercur - Seller account approved!",
+      subject: "Your seller account has been approved",
     },
     data: { data: { user_name: requestData.member.name } },
   });
