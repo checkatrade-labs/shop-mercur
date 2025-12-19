@@ -44,10 +44,14 @@ export async function POST(
       !link.inventory_item_exists || link.inventory_item_deleted_at
     )
 
-    // Build the query to find orphaned rows (hard deleted only - original logic)
+    // Build the query to find orphaned rows
+    // Orphaned = inventory_item doesn't exist (hard deleted) OR is soft-deleted
     const query = knex('seller_seller_inventory_inventory_item as sii')
       .leftJoin('inventory_item as ii', 'ii.id', 'sii.inventory_item_id')
-      .whereNull('ii.id') // Inventory item doesn't exist (hard deleted)
+      .where(function() {
+        this.whereNull('ii.id') // Inventory item doesn't exist (hard deleted)
+          .orWhereNotNull('ii.deleted_at') // OR inventory item is soft-deleted
+      })
       .whereNull('sii.deleted_at') // Link itself is not soft-deleted
       .where('sii.seller_id', seller_id) // Filter by seller_id (required)
 
@@ -71,7 +75,7 @@ export async function POST(
     if (orphanedRows.length === 0) {
       res.status(200).json({
         success: true,
-        message: 'No hard-deleted orphaned seller inventory items found',
+        message: 'No orphaned seller inventory items found (hard-deleted or soft-deleted)',
         deleted_count: 0,
         seller_id: seller_id,
         orphaned_items: [],
@@ -80,8 +84,8 @@ export async function POST(
       return
     }
 
-    // Delete the orphaned rows using SELECT * in NOT EXISTS (as requested)
-    // Original logic: Delete links where inventory_item doesn't exist
+    // Delete the orphaned rows using SELECT * in NOT EXISTS
+    // Delete links where inventory_item doesn't exist OR is soft-deleted
     const deleteQuery = knex('seller_seller_inventory_inventory_item as sii')
       .whereNull('sii.deleted_at')
       .where('sii.seller_id', seller_id) // Filter by seller_id (required)
@@ -89,6 +93,7 @@ export async function POST(
         this.select('*')
           .from('inventory_item as ii')
           .whereRaw('ii.id = sii.inventory_item_id')
+          .whereNull('ii.deleted_at') // Only consider non-deleted inventory items
       })
 
     const deletedCount = await deleteQuery.delete()
