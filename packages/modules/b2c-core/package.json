@@ -1,6 +1,6 @@
 {
   "name": "@mercurjs/b2c-core",
-  "version": "1.5.3",
+  "version": "1.5.0",
   "author": "MercurJS <hello@mercurjs.com> (https://mercurjs.com)",
   "repository": {
     "type": "git",
@@ -35,14 +35,14 @@
     "prepublishOnly": "medusa plugin:build"
   },
   "devDependencies": {
+    "@medusajs/index": "2.11.3",
     "@medusajs/admin-sdk": "2.11.3",
     "@medusajs/cli": "2.11.3",
     "@medusajs/framework": "2.11.3",
-    "@medusajs/icons": "2.11.3",
-    "@medusajs/index": "2.11.3",
     "@medusajs/medusa": "2.11.3",
     "@medusajs/test-utils": "2.11.3",
     "@medusajs/ui": "4.0.25",
+    "@medusajs/icons": "2.11.3",
     "@mercurjs/framework": "*",
     "@swc/core": "1.5.7",
     "@types/node": "^20.0.0",
@@ -57,7 +57,6 @@
     "yalc": "^1.0.0-pre.53"
   },
   "peerDependencies": {
-    "pg": "^8.13.0",
     "@medusajs/admin-sdk": "2.11.3",
     "@medusajs/cli": "2.11.3",
     "@medusajs/framework": "2.11.3",

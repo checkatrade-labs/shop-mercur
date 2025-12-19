@@ -25,6 +25,8 @@ interface EmailTemplateProps {
         phone: string
       }
     }
+    store_name: string
+    storefront_url: string
   }
 }
 
@@ -53,7 +55,7 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
         <thead>
           <tr>
             <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #eee' }}>Product</th>
-            <th style={{ textAlign: 'right', padding: '8px', borderBottom: '1px solid #eee' }}>Amount</th>
+            <th style={{ textAlign: 'right', padding: '8px', borderBottom: '1px solid #eee' }}>Price</th>
             <th style={{ textAlign: 'right', padding: '8px', borderBottom: '1px solid #eee' }}>Qty</th>
             <th style={{ textAlign: 'right', padding: '8px', borderBottom: '1px solid #eee' }}>Total</th>
           </tr>
@@ -129,12 +131,13 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
         </div>
       </div>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        For questions about your order, contact the seller directly.<br />
-        For anything else, email shop@checkatrade.com.
+        You received this email because you made a purchase or sale on the {data.store_name} marketplace.<br />
+        If you have any questions, please contact our support team.
       </div>
       <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: '#888', marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   )
