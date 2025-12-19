@@ -17,7 +17,6 @@ import {
   VendorGetCampaignsParams,
   VendorUpdateCampaign
 } from './validators'
-import { createLinkBody } from '@medusajs/medusa/api/utils/validators'
 
 export const vendorCampaignsMiddlewares: MiddlewareRoute[] = [
   {
