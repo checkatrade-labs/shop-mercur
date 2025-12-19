@@ -18,7 +18,6 @@ import {
   createSellerStockLocation,
   createServiceZoneForFulfillmentSet,
   createStore,
-  createAdminUser
 } from './seed/seed-functions'
 
 export default async function seedMarketplaceData({ container }: ExecArgs) {

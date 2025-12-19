@@ -207,7 +207,6 @@ export async function createPublishableKey(
 }
 
 export async function createProductCategories(container: MedusaContainer) {
-  const productModule = container.resolve(Modules.PRODUCT)
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
   
   // Build category hierarchy from mapping
@@ -987,38 +986,6 @@ export async function createDefaultCommissionLevel(container: MedusaContainer) {
       }
     }
   })
-}
-
-export async function createAdminUser(container: MedusaContainer) {
-  const userService = container.resolve(Modules.USER)
-  const authService = container.resolve(Modules.AUTH)
-  
-  // Check if admin user already exists
-  const existingUsers = await userService.listUsers({ email: 'admin@medusa-test.com' })
-  if (existingUsers && existingUsers.length > 0) {
-    return existingUsers[0]
-  }
-
-  // Create auth identity first
-  const { authIdentity } = await authService.register('emailpass', {
-    body: {
-      email: 'admin@medusa-test.com',
-      password: 'supersecret'
-    }
-  })
-
-  // Create user linked to auth identity
-  const user = await userService.createUsers({
-    email: 'admin@medusa-test.com',
-    first_name: 'Admin',
-    last_name: 'User',
-    metadata: {
-      auth_identity_id: authIdentity?.id
-    }
-  })
-
-  console.log('✅ Admin user created: admin@medusa-test.com')
-  return user
 }
 
 export async function createConfigurationRules(container: MedusaContainer) {
