@@ -5,6 +5,8 @@ interface EmailTemplateProps {
     host: string;
     id: string;
     email: string;
+    marketplace_name: string;
+    storefront_url: string;
   };
 }
 
@@ -54,12 +56,16 @@ export const SellerTeamInviteEmailTemplate: React.FC<
           <span style={{ color: "#606FFF" }}>{`${data.host}`}</span>
         </div>
       </div>
-      <div style={{ fontSize: 13, color: "#040154", marginBottom: 24, opacity: 0.8 }}>
-        If you have any questions, please email shop@checkatrade.com.
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
+        You received this email because you were invited to join a team on the
+        {data.marketplace_name} marketplace.
+        <br />
+        If you have any questions, please contact our support team.
       </div>
       <div style={{ marginTop: 32, color: "#040154" }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
+        <div style={{ fontWeight: 600 }}>The {data.marketplace_name} Team</div>
+        <div style={{ color: "#888", marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   );

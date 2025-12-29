@@ -15,6 +15,8 @@ interface EmailTemplateProps {
         id: string
       }
     }
+    store_name: string
+    storefront_url: string
   }
 }
 
@@ -88,12 +90,14 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
           ))}
         </tbody>
       </table>
-      <div style={{ fontSize: 13, color: '#040154', marginBottom: 24, opacity: 0.8 }}>
-        For platform or payment queries, email shop@checkatrade.com.
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
+        You received this email because you are a seller on the {data.store_name} marketplace.<br />
+        If you have any questions, please contact our support team.
       </div>
       <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: '#888', marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   );

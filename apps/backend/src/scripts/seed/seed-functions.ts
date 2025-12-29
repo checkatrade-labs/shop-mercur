@@ -14,7 +14,8 @@ import {
   createTaxRegionsWorkflow,
   linkSalesChannelsToApiKeyWorkflow,
   updateStoresWorkflow,
-  updateTaxRegionsWorkflow
+  updateTaxRegionsWorkflow,
+  createUserAccountWorkflow
 } from '@medusajs/medusa/core-flows'
 
 import { SELLER_MODULE } from '@mercurjs/b2c-core/modules/seller'
@@ -35,6 +36,46 @@ import { productsToInsert } from './seed-products'
 import { PRODUCT_TYPE_TO_CATEGORY } from '../../lib/category-mapping'
 
 const countries = ['gb']
+
+export async function createAdminUser(container: MedusaContainer) {
+  const authService = container.resolve(Modules.AUTH)
+  const userService = container.resolve(Modules.USER)
+  
+  // Check if admin user already exists
+  const [existingUser] = await userService.listUsers({
+    email: 'admin@mercurjs.com'
+  })
+  
+  if (existingUser) {
+    return existingUser
+  }
+  
+  // Create auth identity with password
+  const { authIdentity } = await authService.register('emailpass', {
+    body: {
+      email: 'admin@mercurjs.com',
+      password: 'supersecret'
+    }
+  })
+  
+  if (!authIdentity?.id) {
+    throw new Error('Failed to create admin auth identity')
+  }
+  
+  // Create admin user account
+  const { result: user } = await createUserAccountWorkflow(container).run({
+    input: {
+      userData: {
+        email: 'admin@mercurjs.com',
+        first_name: 'Admin',
+        last_name: 'User'
+      },
+      authIdentityId: authIdentity.id
+    }
+  })
+  
+  return user
+}
 
 export async function createSalesChannel(container: MedusaContainer) {
   const salesChannelModuleService = container.resolve(Modules.SALES_CHANNEL)
@@ -166,7 +207,6 @@ export async function createPublishableKey(
 }
 
 export async function createProductCategories(container: MedusaContainer) {
-  const productModule = container.resolve(Modules.PRODUCT)
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
   
   // Build category hierarchy from mapping
@@ -946,38 +986,6 @@ export async function createDefaultCommissionLevel(container: MedusaContainer) {
       }
     }
   })
-}
-
-export async function createAdminUser(container: MedusaContainer) {
-  const userService = container.resolve(Modules.USER)
-  const authService = container.resolve(Modules.AUTH)
-  
-  // Check if admin user already exists
-  const existingUsers = await userService.listUsers({ email: 'admin@medusa-test.com' })
-  if (existingUsers && existingUsers.length > 0) {
-    return existingUsers[0]
-  }
-
-  // Create auth identity first
-  const { authIdentity } = await authService.register('emailpass', {
-    body: {
-      email: 'admin@medusa-test.com',
-      password: 'supersecret'
-    }
-  })
-
-  // Create user linked to auth identity
-  const user = await userService.createUsers({
-    email: 'admin@medusa-test.com',
-    first_name: 'Admin',
-    last_name: 'User',
-    metadata: {
-      auth_identity_id: authIdentity?.id
-    }
-  })
-
-  console.log('✅ Admin user created: admin@medusa-test.com')
-  return user
 }
 
 export async function createConfigurationRules(container: MedusaContainer) {

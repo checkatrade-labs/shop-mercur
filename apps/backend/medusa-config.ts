@@ -3,8 +3,18 @@ import { defineConfig, loadEnv } from "@medusajs/framework/utils";
 loadEnv(process.env.NODE_ENV || "development", process.cwd());
 
 module.exports = defineConfig({
+  admin: {
+    disable: true // Disable built-in admin - using separate admin-panel container
+  },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    databaseDriverOptions: {
+      connection: {
+        ssl: {
+          rejectUnauthorized: false
+        }
+      }
+    },
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
@@ -14,9 +24,6 @@ module.exports = defineConfig({
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
     },
-  },
-  admin: {
-    disable: true,
   },
   plugins: [
     {
@@ -104,11 +111,14 @@ module.exports = defineConfig({
             resolve: "@medusajs/medusa/notification-local",
             id: "local",
             options: {
-              channels: ["feed", "seller_feed"],
-            },
-          },
-        ],
-      },
+              channels: ['feed', 'seller_feed']
+            }
+          }
+        ]
+      }
     },
-  ],
-});
+    {
+      resolve: '@medusajs/index'
+    }
+  ]
+})
