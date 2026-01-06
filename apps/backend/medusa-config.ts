@@ -1,51 +1,62 @@
-import { defineConfig, loadEnv } from "@medusajs/framework/utils";
+import { defineConfig, loadEnv } from '@medusajs/framework/utils'
 
-loadEnv(process.env.NODE_ENV || "development", process.cwd());
+loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
 module.exports = defineConfig({
+  admin: {
+    disable: true // Disable built-in admin - using separate admin-panel container
+  },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    databaseDriverOptions: {
+      ...(process.env.NODE_ENV === 'production'
+        ? {
+            connection: {
+              ssl: {
+                rejectUnauthorized: false
+              }
+            }
+          }
+        : {})
+    },
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
       // @ts-expect-error: vendorCors is not a valid config
       vendorCors: process.env.VENDOR_CORS!,
       authCors: process.env.AUTH_CORS!,
-      jwtSecret: process.env.JWT_SECRET || "supersecret",
-      cookieSecret: process.env.COOKIE_SECRET || "supersecret",
-    },
-  },
-  admin: {
-    disable: true,
+      jwtSecret: process.env.JWT_SECRET || 'supersecret',
+      cookieSecret: process.env.COOKIE_SECRET || 'supersecret'
+    }
   },
   plugins: [
     {
-      resolve: "@mercurjs/b2c-core",
-      options: {},
+      resolve: '@mercurjs/b2c-core',
+      options: {}
     },
     {
-      resolve: "@mercurjs/commission",
-      options: {},
+      resolve: '@mercurjs/commission',
+      options: {}
     },
     {
-      resolve: "@mercurjs/algolia",
+      resolve: '@mercurjs/algolia',
       options: {
         apiKey: process.env.ALGOLIA_API_KEY,
-        appId: process.env.ALGOLIA_APP_ID,
-      },
+        appId: process.env.ALGOLIA_APP_ID
+      }
     },
     {
-      resolve: "@mercurjs/reviews",
-      options: {},
+      resolve: '@mercurjs/reviews',
+      options: {}
     },
     {
-      resolve: "@mercurjs/requests",
-      options: {},
+      resolve: '@mercurjs/requests',
+      options: {}
     },
     {
-      resolve: "@mercurjs/resend",
-      options: {},
-    },
+      resolve: '@mercurjs/resend',
+      options: {}
+    }
   ],
   modules: [
     // {
@@ -66,12 +77,12 @@ module.exports = defineConfig({
     //   },
     // },
     {
-      resolve: "@medusajs/medusa/payment",
+      resolve: '@medusajs/medusa/payment',
       options: {
         providers: [
           {
-            resolve: "mercurjs-payment-adyen-connect/providers/adyen-connect",
-            id: "adyen-connect",
+            resolve: 'mercurjs-payment-adyen-connect/providers/adyen-connect',
+            id: 'adyen-connect',
             options: {
               adyenMerchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT,
               adyenThemeId: process.env.ADYEN_THEME_ID,
@@ -81,34 +92,37 @@ module.exports = defineConfig({
               adyenUrlPrefix: process.env.ADYEN_URL_PREFIX,
               adyenEnvironment: process.env.ADYEN_ENVIRONMENT,
               adyenHmacSecret: process.env.ADYEN_HMAC_SECRET,
-              allowedPaymentMethods: process.env.ADYEN_ALLOWED_PAYMENT_METHODS,
-            },
-          },
-        ],
-      },
+              allowedPaymentMethods: process.env.ADYEN_ALLOWED_PAYMENT_METHODS
+            }
+          }
+        ]
+      }
     },
     {
-      resolve: "@medusajs/medusa/notification",
+      resolve: '@medusajs/medusa/notification',
       options: {
         providers: [
           {
-            resolve: "@mercurjs/resend/providers/resend",
-            id: "resend",
+            resolve: '@mercurjs/resend/providers/resend',
+            id: 'resend',
             options: {
-              channels: ["email"],
+              channels: ['email'],
               api_key: process.env.RESEND_API_KEY,
-              from: process.env.RESEND_FROM_EMAIL,
-            },
+              from: process.env.RESEND_FROM_EMAIL
+            }
           },
           {
-            resolve: "@medusajs/medusa/notification-local",
-            id: "local",
+            resolve: '@medusajs/medusa/notification-local',
+            id: 'local',
             options: {
-              channels: ["feed", "seller_feed"],
-            },
-          },
-        ],
-      },
+              channels: ['feed', 'seller_feed']
+            }
+          }
+        ]
+      }
     },
-  ],
-});
+    {
+      resolve: '@medusajs/index'
+    }
+  ]
+})

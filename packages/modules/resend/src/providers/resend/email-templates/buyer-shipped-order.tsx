@@ -28,6 +28,8 @@ interface EmailTemplateProps {
 				phone: string
 			}
 		}
+		store_name: string
+		storefront_url: string
 	}
 }
 
@@ -59,36 +61,14 @@ export const BuyerOrderShippedEmailTemplate: React.FC<Readonly<EmailTemplateProp
         </p>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <a
-          href={`${data.host}/orders/${data.order.id}`}
-          style={{
-            display: 'inline-block',
-            padding: '10px 24px',
-            backgroundColor: '#FF3F3F',
-            color: '#ffffff',
-            borderRadius: '6px',
-            textDecoration: 'none',
-            fontWeight: 600,
-            marginBottom: 8,
-            border: 'none'
-          }}
-        >
-          Track Order
-        </a>
-        <div style={{ fontSize: 13, color: '#040154', marginTop: 8, opacity: 0.7 }}>
-          If you can't click the button, here's your link: <br />
-          <span style={{ color: '#606FFF' }}>{`${data.host}/orders/${data.order.id}`}</span>
-        </div>
-      </div>
-
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
-        For questions about your order, contact the seller directly.<br />
-        For anything else, email shop@checkatrade.com.
-      </div>
-      <div style={{ marginTop: 32, color: '#040154' }}>
+      <p>
+        You received this email because you made a purchase or sale on the {data.store_name} marketplace. If you have any
+        questions, please contact our support team.
+      </p>
+      <div style={{ marginTop: 32 }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: '#888', marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   )

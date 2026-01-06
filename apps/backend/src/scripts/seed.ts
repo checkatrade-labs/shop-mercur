@@ -2,6 +2,7 @@ import { ExecArgs } from '@medusajs/framework/types'
 import { ContainerRegistrationKeys } from '@medusajs/framework/utils'
 
 import {
+  createAdminUser,
   createConfigurationRules,
   createDefaultCommissionLevel,
   createInventoryItemStockLevels,
@@ -17,13 +18,14 @@ import {
   createSellerStockLocation,
   createServiceZoneForFulfillmentSet,
   createStore,
-  createAdminUser
 } from './seed/seed-functions'
 
 export default async function seedMarketplaceData({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
 
   logger.info('=== Configurations ===')
+  logger.info('Creating admin user...')
+  await createAdminUser(container)
   logger.info('Creating default sales channel...')
   const salesChannel = await createSalesChannel(container)
   logger.info('Creating default regions...')
@@ -75,6 +77,9 @@ export default async function seedMarketplaceData({ container }: ExecArgs) {
 
   logger.info('=== Finished ===')
   logger.info(`Publishable api key: ${apiKey.token}`)
+  logger.info(`Admin panel access:`)
+  logger.info(`email: admin@mercurjs.com`)
+  logger.info(`pass: supersecret`)
   logger.info(`Vendor panel access:`)
   logger.info(`email: seller@mercurjs.com`)
   logger.info(`pass: secret`)

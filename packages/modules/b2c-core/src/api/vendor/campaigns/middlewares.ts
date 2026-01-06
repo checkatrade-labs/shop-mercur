@@ -4,6 +4,7 @@ import {
   validateAndTransformQuery
 } from '@medusajs/framework'
 
+import { createLinkBody } from '@medusajs/medusa/api/utils/validators'
 import sellerCampaign from '../../../links/seller-campaign'
 import {
   checkResourceOwnershipByResourceId,
@@ -12,6 +13,7 @@ import {
 import { vendorCampaignQueryConfig } from './query-config'
 import {
   VendorCreateCampaign,
+  VendorGetCampaignByIdParams,
   VendorGetCampaignsParams,
   VendorUpdateCampaign
 } from './validators'
@@ -33,7 +35,7 @@ export const vendorCampaignsMiddlewares: MiddlewareRoute[] = [
     matcher: '/vendor/campaigns/:id',
     middlewares: [
       validateAndTransformQuery(
-        VendorGetCampaignsParams,
+        VendorGetCampaignByIdParams,
         vendorCampaignQueryConfig.retrieve
       ),
       checkResourceOwnershipByResourceId({
@@ -77,5 +79,16 @@ export const vendorCampaignsMiddlewares: MiddlewareRoute[] = [
         vendorCampaignQueryConfig.retrieve
       )
     ]
-  }
+  },
+  {
+    method: ["POST"],
+    matcher: "/vendor/campaigns/:id/promotions",
+    middlewares: [
+      validateAndTransformBody(createLinkBody()),
+      validateAndTransformQuery(
+        VendorGetCampaignsParams,
+        vendorCampaignQueryConfig.retrieve
+      ),
+    ],
+  },
 ]

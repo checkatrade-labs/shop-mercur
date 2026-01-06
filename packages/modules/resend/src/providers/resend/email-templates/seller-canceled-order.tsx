@@ -30,6 +30,8 @@ interface EmailTemplateProps {
 				phone: string
 			}
 		}
+		store_name: string
+		storefront_url: string
 	}
 }
 
@@ -51,7 +53,7 @@ export const SellerCanceledOrderEmailTemplate: React.FC<Readonly<EmailTemplatePr
         This order has been cancelled and the customer has been notified.
       </p>
 
-	    <div style={{ marginBottom: 24 }}>
+	    {/* <div style={{ marginBottom: 24 }}>
         <a
           href={data.order_address}
           style={{
@@ -72,14 +74,15 @@ export const SellerCanceledOrderEmailTemplate: React.FC<Readonly<EmailTemplatePr
           If you can't click the button, here's your link: <br />
           <span style={{ color: '#606FFF' }}>{data.order_address}</span>
         </div>
-      </div>
+      </div> */}
 
       <div style={{ fontSize: 13, color: '#040154', marginBottom: 24, opacity: 0.8 }}>
         For platform queries, email shop@checkatrade.com.
       </div>
       <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: '#888', marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   )
