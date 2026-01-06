@@ -22,7 +22,9 @@ interface EmailTemplateProps {
 
 export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> = ({ data }) => {
   const { order } = data;
-  console.log(JSON.stringify(order, null, 2));
+  console.log("--------------------------------");
+  console.log(JSON.stringify(data, null, 2));
+  console.log("--------------------------------");
 
   return (
     <div style={{

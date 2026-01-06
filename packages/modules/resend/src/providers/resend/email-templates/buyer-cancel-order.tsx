@@ -86,7 +86,7 @@ export const BuyerCancelOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps
         If you have any questions, please contact <b>{data.store_name} Support</b>.
       </div>
 
-      <div style={{ marginBottom: 24 }}>
+      {/* <div style={{ marginBottom: 24 }}>
         <a
           href={data.order_address}
           style={{
@@ -107,7 +107,7 @@ export const BuyerCancelOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps
           If you can't click the button, here's your link: <br />
           <span style={{ color: '#606FFF' }}>{data.order_address}</span>
         </div>
-      </div>
+      </div> */}
 
       <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
         You received this email because you made a purchase or sale on the {data.store_name} marketplace.

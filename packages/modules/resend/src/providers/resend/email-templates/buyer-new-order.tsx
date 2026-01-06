@@ -44,11 +44,11 @@ export const BuyerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> 
       borderRadius: 10
     }}>
       <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#4D0000', fontWeight: 700 }}>
-        Your Checkatrade Shop order #{order.display_id} is confirmed
+        Your {data.store_name} order #{order.display_id} is confirmed
       </h1>
       <p style={{ fontSize: '1.1rem', marginBottom: 24, lineHeight: 1.6 }}>
         Hi {data.user_name},<br />
-        Thanks for shopping with Checkatrade Shop.
+        Thanks for shopping with {data.store_name}.
       </p>
       <h3 style={{ marginTop: 24, marginBottom: 12 }}>Order summary:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
