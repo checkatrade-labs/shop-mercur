@@ -43,6 +43,23 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
         Hi {order.seller.name},<br />
         You have received a new order from {order.customer.first_name} {order.customer.last_name}. Please review the details and begin fulfilment.
       </p>
+      <div style={{ marginBottom: 32, textAlign: 'center' }}>
+        <a
+          href={`${process.env.VENDOR_PANEL_URL}/orders/${order.id}`}
+          style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            backgroundColor: '#4D0000',
+            color: '#fff',
+            textDecoration: 'none',
+            borderRadius: 6,
+            fontWeight: 600,
+            fontSize: '1rem'
+          }}
+        >
+          View Order Details
+        </a>
+      </div>
       <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order items:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
         <thead>
