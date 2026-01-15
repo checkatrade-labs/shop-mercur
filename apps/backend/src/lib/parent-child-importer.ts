@@ -183,35 +183,131 @@ export async function importParentGroup(
     // 6. Read Variation Theme Name to determine how to create options
     const variationTheme = (parentRow['Variation Theme Name'] || '').toUpperCase()
     
-    // Determine what attributes to use based on variation theme
-    const useColor = variationTheme.includes('COLOR')
-    const useSize = variationTheme.includes('SIZE')
-    const useStyle = variationTheme.includes('STYLE')
-    const useQuantity = variationTheme.includes('ITEM_PACKAGE_QUANTITY')
+    /**
+     * Helper function to map variation theme parts to CSV column names
+     * Handles cases like "STYLE/SIZE" where each part maps to a different column
+     */
+    const getColumnForVariationPart = (variationPart: string, availableColumns: string[]): string | null => {
+      const normalizedPart = variationPart.trim().toUpperCase()
+      
+      // Direct mappings for common cases
+      const directMappings: Record<string, string> = {
+        'COLOR': 'Colour',
+        'COLOUR': 'Colour',
+        'SIZE': 'Size',
+        'STYLE': 'Style',
+        'ITEM_PACKAGE_QUANTITY': 'Unit Count',
+        'QUANTITY': 'Unit Count',
+      }
+      
+      // Check direct mapping first
+      if (directMappings[normalizedPart]) {
+        const mappedColumn = directMappings[normalizedPart]
+        if (availableColumns.includes(mappedColumn)) {
+          return mappedColumn
+        }
+      }
+      
+      // Try to find a column that matches the variation part (case-insensitive)
+      // First try exact match (case-insensitive)
+      const exactMatch = availableColumns.find(col => 
+        col.toUpperCase() === normalizedPart
+      )
+      if (exactMatch) return exactMatch
+      
+      // Try partial match (e.g., "STYLE" matches "Style Name" or "Product Style")
+      const partialMatch = availableColumns.find(col => 
+        col.toUpperCase().includes(normalizedPart) || 
+        normalizedPart.includes(col.toUpperCase())
+      )
+      if (partialMatch) return partialMatch
+      
+      // No match found
+      return null
+    }
     
-    // 7. Extract unique values based on variation theme
+    // Parse variation theme into parts (split by /, -, or space)
+    const variationParts = variationTheme
+      .split(/[\/\-\s]+/)
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+    
+    // Get available columns from first child row (all rows should have same columns)
+    const availableColumns = childRows.length > 0 
+      ? Object.keys(childRows[0]) 
+      : Object.keys(parentRow)
+    
+    console.log(`   [DEBUG ${parentSKU}] Available CSV columns: ${availableColumns.join(', ')}`)
+    console.log(`   [DEBUG ${parentSKU}] Variation theme parts: ${variationParts.join(', ')}`)
+    
+    // Map each variation part to its CSV column
+    const variationColumnMap: Record<string, string> = {}
+    
+    variationParts.forEach(part => {
+      const column = getColumnForVariationPart(part, availableColumns)
+      if (column) {
+        variationColumnMap[part] = column
+        console.log(`   [DEBUG ${parentSKU}] Mapped variation part "${part}" → CSV column "${column}"`)
+      } else {
+        console.warn(`   [DEBUG ${parentSKU}] ⚠️  Could not find CSV column for variation part "${part}"`)
+      }
+    })
+    
+    // 7. Extract unique values based on variation theme using dynamic column mapping
     const colors = new Set<string>()
     const sizes = new Set<string>()
     const styles = new Set<string>()
     const quantities = new Set<string>()
     
     childRows.forEach(row => {
-      if (useColor && row['Colour']) colors.add(row['Colour'])
-      if (useSize && row['Size']) sizes.add(row['Size'])
-      if (useStyle && row['Size']) styles.add(row['Size']) // STYLE/SIZE uses Size field
-      if (useQuantity && row['Unit Count']) quantities.add(row['Unit Count'])
+      variationParts.forEach(part => {
+        const column = variationColumnMap[part]
+        if (column && row[column]) {
+          const value = row[column].trim()
+          if (value) {
+            if (part.includes('COLOR') || part.includes('COLOUR')) {
+              colors.add(value)
+            } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+              sizes.add(value)
+            } else if (part.includes('STYLE')) {
+              styles.add(value)
+            } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+              quantities.add(value)
+            }
+          }
+        }
+      })
     })
 
     // Extract unit count type from parent row or first child row
     const unitCountType = parentRow['Unit Count Type'] || childRows[0]?.['Unit Count Type'] || ''
     
     console.log(`   [DEBUG ${parentSKU}] Variation theme: "${variationTheme}"`)
-    console.log(`   [DEBUG ${parentSKU}] Variation flags: Color=${useColor}, Size=${useSize}, Style=${useStyle}, Quantity=${useQuantity}`)
     console.log(`   [DEBUG ${parentSKU}] Found ${childRows.length} child rows (variants)`)
     console.log(`   [DEBUG ${parentSKU}] Unique values: Colors=${colors.size}, Sizes=${sizes.size}, Styles=${styles.size}, Quantities=${quantities.size}`)
 
     // 8. Create variants from child rows
-    let variants = childRows.map((childRow, index) => {
+    // First, filter out variants that are missing required option values
+    const validChildRows = childRows.filter((childRow) => {
+      // Check each variation part has a value
+      for (const part of variationParts) {
+        const column = variationColumnMap[part]
+        if (column) {
+          const value = (childRow[column] || '').trim()
+          if (!value) {
+            console.warn(`   [DEBUG ${parentSKU}] ⚠️  Skipping variant ${childRow[CSVColumn.SKU]}: missing value for "${part}" (column: "${column}")`)
+            return false
+          }
+        }
+      }
+      return true
+    })
+    
+    if (validChildRows.length < childRows.length) {
+      console.warn(`   [DEBUG ${parentSKU}] ⚠️  Filtered out ${childRows.length - validChildRows.length} variants with missing option values`)
+    }
+    
+    let variants = validChildRows.map((childRow, index) => {
       const sku = childRow[CSVColumn.SKU]
       
       // Debug: Log available columns for first child row to help diagnose CSV parsing issues
@@ -223,11 +319,14 @@ export async function importParentGroup(
       const price = extractPrice(childRow)
       const quantity = extractQuantity(childRow)
       
-      // Extract attributes based on variation theme
-      const color = useColor ? (childRow[CSVColumn.COLOUR] || '') : ''
-      const size = useSize ? (childRow[CSVColumn.SIZE] || '') : ''
-      const style = useStyle ? (childRow[CSVColumn.SIZE] || '') : '' // STYLE/SIZE → Size field
-      const quantityValue = useQuantity ? (childRow['Unit Count'] || '') : ''
+      // Extract attributes based on variation theme using dynamic column mapping
+      const variationValues: Record<string, string> = {}
+      variationParts.forEach(part => {
+        const column = variationColumnMap[part]
+        if (column) {
+          variationValues[part] = (childRow[column] || '').trim()
+        }
+      })
       
       const unitCount = childRow['Unit Count'] || ''
       const unitCountType = childRow['Unit Count Type'] || ''
@@ -260,10 +359,13 @@ export async function importParentGroup(
         variantTitle = productTitle
         const titleParts = [sku]
         
-        if (color) titleParts.push(color)
-        if (size) titleParts.push(size)
-        if (style && !size) titleParts.push(style)
-        if (quantityValue) titleParts.push(quantityValue)
+        // Add variation values to title parts
+        variationParts.forEach(part => {
+          const value = variationValues[part]
+          if (value) {
+            titleParts.push(value)
+          }
+        })
         
         if (titleParts.length > 1) {
           variantTitle = titleParts.join(' - ')
@@ -278,16 +380,42 @@ export async function importParentGroup(
       }
 
       // Build options object based on variation theme
+      // IMPORTANT: If a product has multiple options, ALL options MUST have values for each variant
+      // We've already filtered out variants missing required values, so these should all have values
       const options: Record<string, string> = {}
-      if (color) options['Color'] = color
-      if (size) options['Size'] = size
-      if (style && !size) options['Style'] = style
-      if (quantityValue) options['Quantity'] = quantityValue
       
-      // Fallback: if no options, use SKU as option
+      // Use dynamic mapping to build options
+      variationParts.forEach(part => {
+        const value = variationValues[part]
+        if (value) {
+          // Map variation part to option title (capitalize first letter)
+          const optionTitle = part.charAt(0) + part.slice(1).toLowerCase()
+            .replace(/_/g, ' ') // Replace underscores with spaces
+            .replace(/\b\w/g, l => l.toUpperCase()) // Capitalize words
+          
+          // Special handling for common cases
+          if (part.includes('COLOR') || part.includes('COLOUR')) {
+            options['Color'] = value
+          } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+            options['Size'] = value
+          } else if (part.includes('STYLE')) {
+            options['Style'] = value
+          } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+            options['Quantity'] = value
+          } else {
+            // Use the mapped option title for other variation parts
+            options[optionTitle] = value
+          }
+        }
+      })
+      
+      // Fallback: if no options based on theme, use SKU as option
       if (Object.keys(options).length === 0) {
         options['Variant'] = sku
       }
+      
+      // Debug: Log options to help diagnose issues
+      console.log(`   [DEBUG ${parentSKU}] Variant ${sku} options: ${JSON.stringify(options)}`)
 
       // Extract all variant metadata using helper function
       const metadata = extractVariantMetadata(childRow)
@@ -370,33 +498,53 @@ export async function importParentGroup(
     // 9. Build product options based on variation theme
     const productOptions: Array<{ title: string; values: string[] }> = []
     
-    if (useColor && colors.size > 0) {
-      productOptions.push({
-        title: 'Color',
-        values: Array.from(colors)
-      })
-    }
-    
-    if (useSize && sizes.size > 0) {
-      productOptions.push({
-        title: 'Size',
-        values: Array.from(sizes)
-      })
-    }
-    
-    if (useStyle && styles.size > 0) {
-      productOptions.push({
-        title: 'Style',
-        values: Array.from(styles)
-      })
-    }
-    
-    if (useQuantity && quantities.size > 0) {
-      productOptions.push({
-        title: 'Quantity',
-        values: Array.from(quantities)
-      })
-    }
+    // Build options dynamically from variation parts
+    variationParts.forEach(part => {
+      let values: Set<string> | null = null
+      
+      // Map to the correct value set
+      if (part.includes('COLOR') || part.includes('COLOUR')) {
+        values = colors
+      } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+        values = sizes
+      } else if (part.includes('STYLE')) {
+        values = styles
+      } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+        values = quantities
+      } else {
+        // For other variation parts, collect values from the mapped column
+        const column = variationColumnMap[part]
+        if (column) {
+          values = new Set<string>()
+          childRows.forEach(row => {
+            const value = (row[column] || '').trim()
+            if (value) values!.add(value)
+          })
+        }
+      }
+      
+      if (values && values.size > 0) {
+        // Use standard option titles for common cases
+        let finalTitle = part.charAt(0) + part.slice(1).toLowerCase()
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, l => l.toUpperCase())
+        
+        if (part.includes('COLOR') || part.includes('COLOUR')) {
+          finalTitle = 'Color'
+        } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+          finalTitle = 'Size'
+        } else if (part.includes('STYLE')) {
+          finalTitle = 'Style'
+        } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+          finalTitle = 'Quantity'
+        }
+        
+        productOptions.push({
+          title: finalTitle,
+          values: Array.from(values)
+        })
+      }
+    })
     
     // Fallback: if no options based on variation theme, use SKU as option
     if (productOptions.length === 0) {
