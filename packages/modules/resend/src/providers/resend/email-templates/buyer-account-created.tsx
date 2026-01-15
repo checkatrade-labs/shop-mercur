@@ -1,6 +1,8 @@
 interface EmailTemplateProps {
   data: {
     user_name: string;
+    store_name: string;
+    storefront_url: string;
   };
 }
 
@@ -20,14 +22,14 @@ export const BuyerAccountCreatedEmailTemplate: React.FC<
         color: "#040154",
       }}
     >
-      <h1 style={{ fontSize: "2rem", marginBottom: "16px", color: "#4D0000", fontWeight: 700 }}>
-        Welcome to Checkatrade Shop, {data.user_name}
+      <h1 style={{ fontSize: "2rem", marginBottom: "16px", color: "#222" }}>
+        Welcome to {data.store_name}, {data.user_name}!
       </h1>
       <p style={{ fontSize: "1.1rem", marginBottom: "24px", lineHeight: 1.6 }}>
         Your account has been created successfully.
       </p>
       <a
-        href="https://shop.checkatrade.com"
+        href={data.storefront_url}
         style={{
           display: "inline-block",
           padding: "12px 28px",
@@ -40,11 +42,12 @@ export const BuyerAccountCreatedEmailTemplate: React.FC<
           border: "none"
         }}
       >
-        Visit Checkatrade Shop
+        Visit {data.store_name}
       </a>
       <div style={{ marginTop: 32, color: "#040154" }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: "#888", marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   );

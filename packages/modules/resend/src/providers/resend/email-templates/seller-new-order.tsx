@@ -15,11 +15,16 @@ interface EmailTemplateProps {
         id: string
       }
     }
+    store_name: string
+    storefront_url: string
   }
 }
 
 export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>> = ({ data }) => {
   const { order } = data;
+  console.log("--------------------------------");
+  console.log(JSON.stringify(data, null, 2));
+  console.log("--------------------------------");
 
   return (
     <div style={{
@@ -38,6 +43,23 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
         Hi {order.seller.name},<br />
         You have received a new order from {order.customer.first_name} {order.customer.last_name}. Please review the details and begin fulfilment.
       </p>
+      <div style={{ marginBottom: 32, textAlign: 'center' }}>
+        <a
+          href={`${process.env.VENDOR_PANEL_URL}/orders/${order.id}`}
+          style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            backgroundColor: '#4D0000',
+            color: '#fff',
+            textDecoration: 'none',
+            borderRadius: 6,
+            fontWeight: 600,
+            fontSize: '1rem'
+          }}
+        >
+          View Order Details
+        </a>
+      </div>
       <h3 style={{ marginTop: 32, marginBottom: 12 }}>Order items:</h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 32 }}>
         <thead>
@@ -88,12 +110,14 @@ export const SellerNewOrderEmailTemplate: React.FC<Readonly<EmailTemplateProps>>
           ))}
         </tbody>
       </table>
-      <div style={{ fontSize: 13, color: '#040154', marginBottom: 24, opacity: 0.8 }}>
-        For platform or payment queries, email shop@checkatrade.com.
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>
+        You received this email because you are a seller on the {data.store_name} marketplace.<br />
+        If you have any questions, please contact our support team.
       </div>
       <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: '#888', marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   );

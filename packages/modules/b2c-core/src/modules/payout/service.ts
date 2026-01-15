@@ -1,4 +1,4 @@
-import { EntityManager } from "@mikro-orm/knex";
+import { EntityManager } from "@medusajs/framework/mikro-orm/knex";
 import { Types } from "@adyen/api-library";
 
 import { Context } from "@medusajs/framework/types";

@@ -28,6 +28,8 @@ interface EmailTemplateProps {
 				phone: string
 			}
 		}
+		store_name: string
+		storefront_url: string
 	}
 }
 
@@ -63,7 +65,8 @@ export const SellerOrderShippingEmailTemplate: React.FC<Readonly<EmailTemplatePr
       </div>
       <div style={{ marginTop: 32, color: '#040154' }}>
         <div>Best regards,</div>
-        <div style={{ fontWeight: 600 }}>Checkatrade Shop Merchant Support</div>
+        <div style={{ fontWeight: 600 }}>The {data.store_name} Team</div>
+        <div style={{ color: '#888', marginTop: 4 }}>{data.storefront_url}</div>
       </div>
     </div>
   )
