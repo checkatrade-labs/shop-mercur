@@ -285,6 +285,7 @@ export async function POST(
         salesChannelId,
         regionId
       },
+      logger,
       req.scope
     )
 
@@ -294,6 +295,7 @@ export async function POST(
     logger.info(`\n${'='.repeat(60)}`)
     logger.info(`📊 [Product Import] FINAL SUMMARY`)
     logger.info(`${'='.repeat(60)}`)
+    logger.info(`   Total rows in CSV: ${rows.length}`)
     logger.info(`   Total unique products in CSV: ${groups.length}`)
     logger.info(`   ✅ Successfully imported: ${importResults.success}`)
     logger.info(`   ❌ Failed during import: ${importResults.failed}`)
