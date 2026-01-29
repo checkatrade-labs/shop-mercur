@@ -913,7 +913,7 @@ export async function importParentGroup(
     // Create a map of SKU to childRow for efficient lookup
     const childRowMap = new Map<string, CSVRow>()
     childRows.forEach(row => {
-      const sku = row['SKU']
+      const sku = row[CSVColumn.SKU]
       if (sku) {
         childRowMap.set(sku, row)
       }
@@ -972,8 +972,8 @@ export async function importParentGroup(
               updated_at: new Date()
             })
           }
-        } catch (linkError: any) {
-          logger.warn(`${parentSKU}] ⚠️  Could not link inventory item to seller: ${linkError.message}`)
+        } catch (err: any) {
+          logger.warn(`${parentSKU}] ⚠️  Could not link inventory item to seller: ${err.message}`)
         }
 
         // Link inventory item to variant
@@ -1003,6 +1003,7 @@ export async function importParentGroup(
           ])
         }
       } catch (invError: any) {
+        // Inventory error - non-fatal
         logger.warn(`${parentSKU}] ⚠️  Could not create inventory level: ${invError.message}`)
       }
     }
