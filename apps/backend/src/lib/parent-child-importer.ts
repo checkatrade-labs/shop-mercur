@@ -21,6 +21,68 @@ import {
 } from './csv-parser'
 import { getCategoryForProductType } from './category-mapping'
 
+/**
+ * Valid variation theme parts that can be used in Variation Theme Name
+ */
+export const VARIATION_THEME_PARTS = {
+  COLOR: 'COLOR',
+  COLOUR: 'COLOUR',
+  SIZE: 'SIZE',
+  STYLE: 'STYLE',
+  MATERIAL: 'MATERIAL',
+  EDGE: 'EDGE',
+  SHAPE: 'SHAPE',
+  FINISH: 'FINISH',
+  QUANTITY: 'QUANTITY',
+  ITEM_PACKAGE_QUANTITY: 'ITEM_PACKAGE_QUANTITY',
+} as const
+
+export type VariationThemePart = typeof VARIATION_THEME_PARTS[keyof typeof VARIATION_THEME_PARTS]
+
+/**
+ * Parse and validate variation theme string
+ * Returns array of normalized variation parts
+ */
+function parseVariationTheme(variationThemeRaw: string): string[] {
+  if (!variationThemeRaw || variationThemeRaw.trim() === '') {
+    return []
+  }
+
+  const normalized = variationThemeRaw.toUpperCase().trim()
+
+  // Split by common separators: /, -, space
+  const parts = normalized
+    .split(/[/\-\s]+/)
+    .map(part => part.trim())
+    .filter(part => part.length > 0)
+
+  return parts
+}
+
+/**
+ * Mapping of CSV columns to their variation option names
+ */
+interface VariationColumnMapping {
+  [variationPart: string]: string // variationPart -> CSV column name
+}
+
+/**
+ * Variation values extracted from a CSV row
+ */
+interface VariationValues {
+  [variationPart: string]: string
+}
+
+/**
+ * Check if a variation part matches a specific type (type-safe)
+ */
+function isVariationPartType(part: string, type: VariationThemePart | VariationThemePart[]): boolean {
+  const normalizedPart = part.toUpperCase().trim()
+  const types = Array.isArray(type) ? type : [type]
+
+  return types.some(t => normalizedPart.includes(t))
+}
+
 interface ImportContext {
   sellerId: string
   stockLocationId: string
@@ -181,27 +243,28 @@ export async function importParentGroup(
     }
 
     // 6. Read Variation Theme Name to determine how to create options
-    const variationTheme = (parentRow[CSVColumn.VARIATION_THEME_NAME] || '').toUpperCase()
-    
+    const variationThemeRaw = parentRow[CSVColumn.VARIATION_THEME_NAME] || ''
+    const variationParts = parseVariationTheme(variationThemeRaw)
+
     /**
      * Helper function to map variation theme parts to CSV column names
      * Handles cases like "STYLE/SIZE" where each part maps to a different column
      */
-    const getColumnForVariationPart = (variationPart: string, availableColumns: string[]): string | null => {
+    const getColumnForVariationPart = (variationPart: string, availableColumns: readonly string[]): string | null => {
       const normalizedPart = variationPart.trim().toUpperCase()
       
       // Direct mappings for common cases
       const directMappings: Record<string, string> = {
-        'COLOR': 'Colour',
-        'COLOUR': 'Colour',
-        'SIZE': 'Size',
-        'STYLE': 'Style',
-        'MATERIAL': 'Material',
-        'EDGE': 'Edge',
-        'SHAPE': 'Shape',
-        'FINISH': 'Finish',
-        'ITEM_PACKAGE_QUANTITY': 'Units per Product',
-        'QUANTITY': 'Units per Product',
+        [VARIATION_THEME_PARTS.COLOR]: 'Colour',
+        [VARIATION_THEME_PARTS.COLOUR]: 'Colour',
+        [VARIATION_THEME_PARTS.SIZE]: 'Size',
+        [VARIATION_THEME_PARTS.STYLE]: 'Style',
+        [VARIATION_THEME_PARTS.MATERIAL]: 'Material',
+        [VARIATION_THEME_PARTS.EDGE]: 'Edge',
+        [VARIATION_THEME_PARTS.SHAPE]: 'Shape',
+        [VARIATION_THEME_PARTS.FINISH]: 'Finish',
+        [VARIATION_THEME_PARTS.ITEM_PACKAGE_QUANTITY]: 'Units per Product',
+        [VARIATION_THEME_PARTS.QUANTITY]: 'Units per Product',
       }
       
       // Check direct mapping first
@@ -229,23 +292,18 @@ export async function importParentGroup(
       // No match found
       return null
     }
-    
-    // Parse variation theme into parts (split by /, -, or space)
-    const variationParts = variationTheme
-      .split(/[/\-\s]+/)
-      .map(part => part.trim())
-      .filter(part => part.length > 0)
-    
+
     // Get available columns from first child row (all rows should have same columns)
     const availableColumns = childRows.length > 0 
       ? Object.keys(childRows[0]) 
       : Object.keys(parentRow)
     
     logger.debug(`${parentSKU}] Available CSV columns: ${availableColumns.join(', ')}`)
+    logger.debug(`${parentSKU}] Variation theme raw: "${variationThemeRaw}"`)
     logger.debug(`${parentSKU}] Variation theme parts: ${variationParts.join(', ')}`)
-    
+
     // Map each variation part to its CSV column
-    const variationColumnMap: Record<string, string> = {}
+    const variationColumnMap: VariationColumnMapping = {}
     
     variationParts.forEach(part => {
       const column = getColumnForVariationPart(part, availableColumns)
@@ -269,13 +327,13 @@ export async function importParentGroup(
         if (column && row[column]) {
           const value = row[column].trim()
           if (value) {
-            if (part.includes('COLOR') || part.includes('COLOUR')) {
+            if (isVariationPartType(part, [VARIATION_THEME_PARTS.COLOR, VARIATION_THEME_PARTS.COLOUR])) {
               colors.add(value)
-            } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+            } else if (isVariationPartType(part, VARIATION_THEME_PARTS.SIZE) && !isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
               sizes.add(value)
-            } else if (part.includes('STYLE')) {
+            } else if (isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
               styles.add(value)
-            } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+            } else if (isVariationPartType(part, [VARIATION_THEME_PARTS.QUANTITY, VARIATION_THEME_PARTS.ITEM_PACKAGE_QUANTITY])) {
               quantities.add(value)
             }
           }
@@ -283,7 +341,7 @@ export async function importParentGroup(
       })
     })
 
-    logger.debug(`${parentSKU}] Variation theme: "${variationTheme}"`)
+    logger.debug(`${parentSKU}] Variation theme: "${variationThemeRaw}"`)
     logger.debug(`${parentSKU}] Found ${childRows.length} child rows (variants)`)
     logger.debug(`${parentSKU}] Unique values: Colors=${colors.size}, Sizes=${sizes.size}, Styles=${styles.size}, Quantities=${quantities.size}`)
 
@@ -319,7 +377,7 @@ export async function importParentGroup(
       const price = extractPrice(childRow)
       
       // Extract attributes based on variation theme using dynamic column mapping
-      const variationValues: Record<string, string> = {}
+      const variationValues: VariationValues = {}
       variationParts.forEach(part => {
         const column = variationColumnMap[part]
         if (column) {
@@ -381,13 +439,13 @@ export async function importParentGroup(
             .replace(/\b\w/g, l => l.toUpperCase()) // Capitalize words
           
           // Special handling for common cases
-          if (part.includes('COLOR') || part.includes('COLOUR')) {
+          if (isVariationPartType(part, [VARIATION_THEME_PARTS.COLOR, VARIATION_THEME_PARTS.COLOUR])) {
             options['Color'] = value
-          } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+          } else if (isVariationPartType(part, VARIATION_THEME_PARTS.SIZE) && !isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
             options['Size'] = value
-          } else if (part.includes('STYLE')) {
+          } else if (isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
             options['Style'] = value
-          } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+          } else if (isVariationPartType(part, [VARIATION_THEME_PARTS.QUANTITY, VARIATION_THEME_PARTS.ITEM_PACKAGE_QUANTITY])) {
             options['Quantity'] = value
           } else {
             // Use the mapped option title for other variation parts
@@ -490,13 +548,13 @@ export async function importParentGroup(
       let values: Set<string> | null = null
       
       // Map to the correct value set
-      if (part.includes('COLOR') || part.includes('COLOUR')) {
+      if (isVariationPartType(part, [VARIATION_THEME_PARTS.COLOR, VARIATION_THEME_PARTS.COLOUR])) {
         values = colors
-      } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+      } else if (isVariationPartType(part, VARIATION_THEME_PARTS.SIZE) && !isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
         values = sizes
-      } else if (part.includes('STYLE')) {
+      } else if (isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
         values = styles
-      } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+      } else if (isVariationPartType(part, [VARIATION_THEME_PARTS.QUANTITY, VARIATION_THEME_PARTS.ITEM_PACKAGE_QUANTITY])) {
         values = quantities
       } else {
         // For other variation parts, collect values from the mapped column
@@ -509,20 +567,20 @@ export async function importParentGroup(
           })
         }
       }
-      
+
       if (values && values.size > 0) {
         // Use standard option titles for common cases
         let finalTitle = part.charAt(0) + part.slice(1).toLowerCase()
           .replace(/_/g, ' ')
           .replace(/\b\w/g, l => l.toUpperCase())
-        
-        if (part.includes('COLOR') || part.includes('COLOUR')) {
+
+        if (isVariationPartType(part, [VARIATION_THEME_PARTS.COLOR, VARIATION_THEME_PARTS.COLOUR])) {
           finalTitle = 'Color'
-        } else if (part.includes('SIZE') && !part.includes('STYLE')) {
+        } else if (isVariationPartType(part, VARIATION_THEME_PARTS.SIZE) && !isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
           finalTitle = 'Size'
-        } else if (part.includes('STYLE')) {
+        } else if (isVariationPartType(part, VARIATION_THEME_PARTS.STYLE)) {
           finalTitle = 'Style'
-        } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
+        } else if (isVariationPartType(part, [VARIATION_THEME_PARTS.QUANTITY, VARIATION_THEME_PARTS.ITEM_PACKAGE_QUANTITY])) {
           finalTitle = 'Quantity'
         }
         
