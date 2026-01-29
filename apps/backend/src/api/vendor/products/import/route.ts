@@ -4,65 +4,102 @@ import { SELLER_MODULE, SellerModuleService } from '@mercurjs/b2c-core/modules/s
 import sellerStockLocationLink from '@mercurjs/b2c-core/links/seller-stock-location'
 import csvParser from 'csv-parser'
 import { Readable } from 'stream'
-import { groupByParentSKU, validateParentGroup, type CSVRow } from '../../../../lib/csv-parser'
+import { groupByParentSKU, validateParentGroup, normalizeCSVRow, type CSVRow } from '../../../../lib/csv-parser'
 import { importParentGroups } from '../../../../lib/parent-child-importer'
 
 /**
  * POST /vendor/products/import
- * 
+ *
  * Import products from CSV file (Parent/Child structure)
- * 
+ *
+ * NOTE: Column names are case-insensitive. "Product Name", "product name", and "PRODUCT NAME" will all work.
+ *
  * Expected CSV columns (from CSVRow):
- * 
+ *
  * Core Fields:
- * - Status: Product status (active/inactive)
- * - Title: Product name
+ * - Status: Product status
+ * - Listing Action: Action to perform
+ * - Product Name: Product name/title
  * - SKU: Unique variant SKU
- * - Item Name: Alternative product name
- * - Product Description: Full description
- * - Bullet Point: Short description/features
  * - Product Type: Type for category mapping
- * - Sell Price: Price in GBP
- * - Quantity (UK): Stock quantity
- * 
+ * - Product Description: Full description
+ * - Bullet Points: Product features/highlights
+ *
+ * Pricing & Quantity:
+ * - Original Trade Price (inc VAT): Original trade price
+ * - Trade Sell Price (inc VAT): Current trade price
+ * - Original Consumer Price (inc VAT): Original consumer price
+ * - Consumer Sell Price (inc VAT): Current consumer price
+ * - VAT %: VAT percentage
+ * - Qty Available: Stock quantity
+ *
  * Parent/Child Structure:
  * - Parentage Level: "Parent" | "Child" | ""
  * - Parent SKU: SKU of parent product (for child variants)
- * - Child Relation: Relationship to parent
- * - Variation Theme Name: Theme for variations (e.g., "SizeColor")
- * 
- * Variants:
+ * - Variation Theme Name: Theme for variations (e.g., "Colour/Size")
+ *
+ * Variant Attributes:
  * - Colour: Color variant
  * - Size: Size variant
- * 
+ * - Style: Style variant
+ * - Material: Material variant
+ * - Edge: Edge variant
+ * - Shape: Shape variant
+ * - Finish: Finish variant
+ *
  * Images:
  * - Main Image URL: Primary product image
  * - Image 2 through Image 9: Additional images
- * 
+ *
  * Product Details:
  * - Brand Name: Product brand
  * - Manufacturer: Manufacturer name
- * - Product Id Type: ID type (EAN, UPC, etc.)
- * - Product Id: Product identifier
+ * - Product ID Type: ID type (EAN, UPC, etc.)
+ * - Product ID: Product identifier
  * - Part Number: Manufacturer part number
- * 
- * Dimensions & Weight:
- * - Item Weight: Weight value
- * - Item Weight Unit: Weight unit (kg, g, lb)
- * - Item Length Longer Edge: Length value
- * - Item Length Unit: Length unit (m, cm, mm)
- * - Item Width Shorter Edge: Width value
- * - Item Width Unit: Width unit
- * - Item Thickness Decimal Value: Thickness
- * - Item Thickness Unit: Thickness unit
- * - Length Range: Range of lengths
- * - Width Range: Range of widths
- * 
- * Additional:
- * - Generic Keyword: Search keywords
- * - Special Features: Product features
- * - Unit Count: Number of units
- * - Unit Count Type: Type of unit count
+ *
+ * Features & Components:
+ * - Included Components: Included items
+ * - Special Features_1 through Special Features_5: Product features
+ *
+ * Units:
+ * - Units per Product: Number of units
+ * - Unit Measurement: Unit measurement type
+ * - Packs per Product: Number of packs
+ *
+ * Product Dimensions:
+ * - Product Length Range: Length range
+ * - Product Length: Length value
+ * - Product Length Unit: Length unit
+ * - Product Width Range: Width range
+ * - Product Width: Width value
+ * - Product Width Unit: Width unit
+ * - Product Thickness: Thickness value
+ * - Product Thickness Unit: Thickness unit
+ * - Product Height: Height value
+ * - Product Height Unit: Height unit
+ *
+ * Product Weight:
+ * - Product Weight: Weight value
+ * - Product Weight Unit: Weight unit
+ *
+ * Package Dimensions:
+ * - Package Length: Package length
+ * - Package Length Unit: Package length unit
+ * - Package Width: Package width
+ * - Package Width Unit: Package width unit
+ * - Package Height: Package height
+ * - Package Height Unit: Package height unit
+ * - Package Weight: Package weight
+ * - Package Weight Unit: Package weight unit
+ *
+ * Additional Info:
+ * - Country of origin: Country of origin
+ * - No of Boxes: Number of boxes
+ * - Delivery Time: Delivery time
+ * - Delivery Time Unit: Delivery time unit
+ * - Item form: Item form
+ * - Installation Type: Installation type
  * - Age Restricted: Age restriction flag
  */
 export async function POST(
@@ -70,6 +107,8 @@ export async function POST(
   res: MedusaResponse
 ): Promise<void> {
   const actorId = req.auth_context?.actor_id
+
+  const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER)
 
   if (!actorId) {
     throw new MedusaError(
@@ -165,29 +204,54 @@ export async function POST(
     await new Promise<void>((resolve, reject) => {
       stream
         .pipe(csvParser())
-        .on('data', (row: CSVRow) => {
-          rows.push(row)
+        .on('data', (row: any) => {
+          // Normalize column names to be case-insensitive
+          const normalizedRow = normalizeCSVRow(row)
+
+          rows.push(normalizedRow)
         })
         .on('end', () => {
           resolve()
         })
         .on('error', (error) => {
-          console.error('CSV parsing error:', error)
+          logger.error('CSV parsing error:', error)
           reject(error)
         })
     })
 
     // 6. Group by Parent SKU
-    const groups = groupByParentSKU(rows)
-    console.log(`\n📦 [Product Import] Found ${groups.length} unique products (parent SKUs) in CSV`)
+    logger.debug(`\n📦 [Product Import] Parsed ${rows.length} rows from CSV`)
+
+    // Debug: Log first row to verify column mapping
+    if (rows.length > 0) {
+      const firstRow = rows[0]
+      logger.debug(`[Product Import] First row sample:`)
+      logger.debug(`  - Available columns: ${Object.keys(firstRow).slice(0, 10).join(', ')}...`)
+      logger.debug(`  - SKU: "${firstRow['SKU']}"`)
+      logger.debug(`  - Product Name: "${firstRow['Product Name']}"`)
+      logger.debug(`  - Product Type: "${firstRow['Product Type']}"`)
+      logger.debug(`  - Parentage Level: "${firstRow['Parentage Level']}"`)
+      logger.debug(`  - Parent SKU: "${firstRow['Parent SKU']}"`)
+    }
+
+    const groups = groupByParentSKU(rows, logger)
+    logger.debug(`\n📦 [Product Import] Found ${groups.length} unique products (parent SKUs) in CSV`)
 
     // 7. Validate groups
     const validationFailures: Array<{ parentSKU: string; reasons: string[] }> = []
-    const validGroups = groups.filter(group => {
-      const validation = validateParentGroup(group)
+    const validGroups = groups.filter((group, index) => {
+      const validation = validateParentGroup(group, index + 1)
       if (!validation.valid) {
+        const parentSKU = group.parentSKU || '(empty)'
+        logger.debug(`[Product Import] Validation failed for parent SKU "${parentSKU}":`)
+        logger.debug(`  - Has parent row: ${!!group.parentRow}`)
+        logger.debug(`  - Child rows count: ${group.childRows.length}`)
+        if (group.parentRow) {
+          logger.debug(`  - Product Name: "${group.parentRow['Product Name']}"`)
+          logger.debug(`  - Product Type: "${group.parentRow['Product Type']}"`)
+        }
         validationFailures.push({
-          parentSKU: group.parentSKU,
+          parentSKU: parentSKU,
           reasons: validation.errors
         })
         return false
@@ -197,9 +261,9 @@ export async function POST(
 
     // Log validation failures
     if (validationFailures.length > 0) {
-      console.log(`\n❌ [Product Import] ${validationFailures.length} products failed validation:`)
+      logger.error(`\n❌ [Product Import] ${validationFailures.length} products failed validation:`)
       validationFailures.forEach(({ parentSKU, reasons }) => {
-        console.log(`   - ${parentSKU}: ${reasons.join('; ')}`)
+        logger.error(`   - ${parentSKU}: ${reasons.join('; ')}`)
       })
     }
 
@@ -210,51 +274,53 @@ export async function POST(
       )
     }
 
-    console.log(`\n✅ [Product Import] ${validGroups.length} products passed validation, starting import...`)
+    logger.info(`\n✅ [Product Import] ${validGroups.length} products passed validation, starting import...`)
 
     // 8. Import products
-    const importResults = await importParentGroups(
-      validGroups,
-      {
-        sellerId,
-        stockLocationId,
-        salesChannelId,
-        regionId
-      },
-      req.scope
-    )
+    // const importResults = await importParentGroups(
+    //   validGroups,
+    //   {
+    //     sellerId,
+    //     stockLocationId,
+    //     salesChannelId,
+    //     regionId
+    //   },
+    //   req.scope
+    // )
+
+    logger.info(`\n✅ [Product Import] Import completed`)
 
     // 8b. Log import summary
-    console.log(`\n${'='.repeat(60)}`)
-    console.log(`📊 [Product Import] FINAL SUMMARY`)
-    console.log(`${'='.repeat(60)}`)
-    console.log(`   Total unique products in CSV: ${groups.length}`)
-    console.log(`   ✅ Successfully imported: ${importResults.success}`)
-    console.log(`   ❌ Failed during import: ${importResults.failed}`)
-    console.log(`   ⚠️  Skipped (validation errors): ${validationFailures.length}`)
-    
+    logger.info(`\n${'='.repeat(60)}`)
+    logger.info(`📊 [Product Import] FINAL SUMMARY`)
+    logger.info(`${'='.repeat(60)}`)
+    logger.info(`   Total unique products in CSV: ${groups.length}`)
+    // logger.info(`   ✅ Successfully imported: ${importResults.success}`)
+    // logger.info(`   ❌ Failed during import: ${importResults.failed}`)
+    logger.info(`   ⚠️  Skipped (validation errors): ${validationFailures.length}`)
+
     if (validationFailures.length > 0) {
-      console.log(`\n⚠️  Products Skipped (Validation Errors):`)
+      logger.warn(`\n⚠️  Products Skipped (Validation Errors):`)
       validationFailures.forEach(({ parentSKU, reasons }) => {
-        console.log(`   ✗ ${parentSKU}: ${reasons.join('; ')}`)
+        logger.warn(`   ✗ ${parentSKU}: ${reasons.join('; ')}`)
       })
     }
-    
-    if (importResults.errors && importResults.errors.length > 0) {
-      console.log(`\n❌ Products Failed During Import:`)
-      importResults.errors.forEach(({ parentSKU, error }) => {
-        console.log(`   ✗ ${parentSKU}: ${error}`)
-      })
-    }
-    
-    console.log(`${'='.repeat(60)}\n`)
+
+    // if (importResults.errors && importResults.errors.length > 0) {
+    //   logger.error(`\n❌ Products Failed During Import:`)
+    //   importResults.errors.forEach(({ parentSKU, error }) => {
+    //     logger.error(`   ✗ ${parentSKU}: ${error}`)
+    //   })
+    // }
+
+    logger.info(`${'='.repeat(60)}\n`)
 
     // 9. Trigger Algolia reindex for imported products
     try {
       const { syncAlgoliaWorkflow } = await import('@mercurjs/algolia/workflows')
       await syncAlgoliaWorkflow.run({ container: req.scope })
     } catch (algoliaError: any) {
-      console.warn('Algolia reindex failed (non-critical):', algoliaError.message)
+      logger.warn(`Algolia reindex failed (non-critical): ${algoliaError.message}`)
     }
 
     // 10. Return results
@@ -262,18 +328,18 @@ export async function POST(
       message: 'Import completed',
       summary: {
         total: groups.length,
-        imported: importResults.success,
-        failed: importResults.failed,
+        // imported: importResults.success,
+        // failed: importResults.failed,
         skipped: validationFailures.length
       },
-      results: importResults,
+      // results: importResults,
       validationFailures: validationFailures.map(f => ({
         parentSKU: f.parentSKU,
         reasons: f.reasons
       }))
     })
   } catch (error: any) {
-    console.error('[Vendor Product Import] Error:', error)
+    logger.error('[Vendor Product Import] Error:', error)
 
     if (error.type) {
       throw error

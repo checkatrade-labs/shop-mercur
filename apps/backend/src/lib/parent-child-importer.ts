@@ -53,8 +53,7 @@ export async function importParentGroup(
     // 2. Determine product name and description
     // Product title comes from parent row (this is a parent product with multiple variants)
     // Each variant will have its own title from its child row
-    const productTitle = parentRow[CSVColumn.TITLE] || 
-                        parentRow[CSVColumn.ITEM_NAME] || 
+    const productTitle = parentRow[CSVColumn.PRODUCT_NAME] ||
                         `Product ${parentSKU}`
     
     let productDescription = parentRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
@@ -181,7 +180,7 @@ export async function importParentGroup(
     }
 
     // 6. Read Variation Theme Name to determine how to create options
-    const variationTheme = (parentRow['Variation Theme Name'] || '').toUpperCase()
+    const variationTheme = (parentRow[CSVColumn.VARIATION_THEME_NAME] || '').toUpperCase()
     
     /**
      * Helper function to map variation theme parts to CSV column names
@@ -196,8 +195,12 @@ export async function importParentGroup(
         'COLOUR': 'Colour',
         'SIZE': 'Size',
         'STYLE': 'Style',
-        'ITEM_PACKAGE_QUANTITY': 'Unit Count',
-        'QUANTITY': 'Unit Count',
+        'MATERIAL': 'Material',
+        'EDGE': 'Edge',
+        'SHAPE': 'Shape',
+        'FINISH': 'Finish',
+        'ITEM_PACKAGE_QUANTITY': 'Units per Product',
+        'QUANTITY': 'Units per Product',
       }
       
       // Check direct mapping first
@@ -279,8 +282,8 @@ export async function importParentGroup(
       })
     })
 
-    // Extract unit count type from parent row or first child row
-    const unitCountType = parentRow['Unit Count Type'] || childRows[0]?.['Unit Count Type'] || ''
+    // Extract unit measurement from parent row or first child row
+    const unitMeasurement = parentRow[CSVColumn.UNIT_MEASUREMENT] || childRows[0]?.[CSVColumn.UNIT_MEASUREMENT] || ''
     
     console.log(`   [DEBUG ${parentSKU}] Variation theme: "${variationTheme}"`)
     console.log(`   [DEBUG ${parentSKU}] Found ${childRows.length} child rows (variants)`)
@@ -313,8 +316,7 @@ export async function importParentGroup(
       // Debug: Log available columns for first child row to help diagnose CSV parsing issues
       if (index === 0) {
         console.log(`   [DEBUG ${parentSKU}] First child row columns: ${Object.keys(childRow).join(', ')}`)
-        console.log(`   [DEBUG ${parentSKU}] First child row Title value: "${childRow[CSVColumn.TITLE] || childRow['Title'] || 'NOT FOUND'}"`)
-        console.log(`   [DEBUG ${parentSKU}] First child row Item Name value: "${childRow[CSVColumn.ITEM_NAME] || childRow['Item Name'] || 'NOT FOUND'}"`)
+        console.log(`   [DEBUG ${parentSKU}] First child row Product Name value: "${childRow[CSVColumn.PRODUCT_NAME] || 'NOT FOUND'}"`)
       }
       const price = extractPrice(childRow)
       const quantity = extractQuantity(childRow)
@@ -328,32 +330,23 @@ export async function importParentGroup(
         }
       })
       
-      const unitCount = childRow['Unit Count'] || ''
-      const unitCountType = childRow['Unit Count Type'] || ''
+      const unitsPerProduct = childRow[CSVColumn.UNITS_PER_PRODUCT] || ''
+      const unitMeasurement = childRow[CSVColumn.UNIT_MEASUREMENT] || ''
 
-      // PRIORITY: Use Title field from CSV directly - this is the full product title from CSV
-      // The Title column in child rows contains the complete product title for that variant
+      // PRIORITY: Use Product Name field from CSV directly - this is the full product title from CSV
+      // The Product Name column in child rows contains the complete product title for that variant
       let variantTitle: string | null = null
-      
-      // Get Title column directly - only use "Title"
-      const titleValue = childRow['Title']
-      if (titleValue && typeof titleValue === 'string' && titleValue.trim() !== '') {
-        variantTitle = titleValue.trim()
-        console.log(`   [DEBUG ${parentSKU}] Variant ${sku}: Found title from "Title" column: "${variantTitle}"`)
-      }
-      
-      // Fallback to Item Name if Title is not found
-      if (!variantTitle) {
-        const itemNameValue = childRow['Item Name']
-        if (itemNameValue && typeof itemNameValue === 'string' && itemNameValue.trim() !== '') {
-          variantTitle = itemNameValue.trim()
-          console.log(`   [DEBUG ${parentSKU}] Variant ${sku}: Found title from "Item Name" column: "${variantTitle}"`)
-        }
+
+      // Get Product Name column directly
+      const productNameValue = childRow[CSVColumn.PRODUCT_NAME]
+      if (productNameValue && typeof productNameValue === 'string' && productNameValue.trim() !== '') {
+        variantTitle = productNameValue.trim()
+        console.log(`   [DEBUG ${parentSKU}] Variant ${sku}: Found title from "Product Name" column: "${variantTitle}"`)
       }
       
       // LAST RESORT: Only construct from parts if no CSV title found
       if (!variantTitle || variantTitle.trim() === '') {
-        console.warn(`   [DEBUG ${parentSKU}] ⚠️  Variant ${sku}: No Title or Item Name found in CSV. Available columns: ${Object.keys(childRow).join(', ')}`)
+        console.warn(`   [DEBUG ${parentSKU}] ⚠️  Variant ${sku}: No Product Name found in CSV. Available columns: ${Object.keys(childRow).join(', ')}`)
         console.warn(`   [DEBUG ${parentSKU}] ⚠️  Falling back to constructing title from parts`)
         
         variantTitle = productTitle
