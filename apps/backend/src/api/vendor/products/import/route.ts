@@ -277,16 +277,16 @@ export async function POST(
     logger.info(`\n✅ [Product Import] ${validGroups.length} products passed validation, starting import...`)
 
     // 8. Import products
-    // const importResults = await importParentGroups(
-    //   validGroups,
-    //   {
-    //     sellerId,
-    //     stockLocationId,
-    //     salesChannelId,
-    //     regionId
-    //   },
-    //   req.scope
-    // )
+    const importResults = await importParentGroups(
+      validGroups,
+      {
+        sellerId,
+        stockLocationId,
+        salesChannelId,
+        regionId
+      },
+      req.scope
+    )
 
     logger.info(`\n✅ [Product Import] Import completed`)
 
@@ -295,8 +295,8 @@ export async function POST(
     logger.info(`📊 [Product Import] FINAL SUMMARY`)
     logger.info(`${'='.repeat(60)}`)
     logger.info(`   Total unique products in CSV: ${groups.length}`)
-    // logger.info(`   ✅ Successfully imported: ${importResults.success}`)
-    // logger.info(`   ❌ Failed during import: ${importResults.failed}`)
+    logger.info(`   ✅ Successfully imported: ${importResults.success}`)
+    logger.info(`   ❌ Failed during import: ${importResults.failed}`)
     logger.info(`   ⚠️  Skipped (validation errors): ${validationFailures.length}`)
 
     if (validationFailures.length > 0) {
@@ -306,12 +306,12 @@ export async function POST(
       })
     }
 
-    // if (importResults.errors && importResults.errors.length > 0) {
-    //   logger.error(`\n❌ Products Failed During Import:`)
-    //   importResults.errors.forEach(({ parentSKU, error }) => {
-    //     logger.error(`   ✗ ${parentSKU}: ${error}`)
-    //   })
-    // }
+    if (importResults.errors && importResults.errors.length > 0) {
+      logger.error(`\n❌ Products Failed During Import:`)
+      importResults.errors.forEach(({ parentSKU, error }) => {
+        logger.error(`   ✗ ${parentSKU}: ${error}`)
+      })
+    }
 
     logger.info(`${'='.repeat(60)}\n`)
 
@@ -328,8 +328,8 @@ export async function POST(
       message: 'Import completed',
       summary: {
         total: groups.length,
-        // imported: importResults.success,
-        // failed: importResults.failed,
+        imported: importResults.success,
+        failed: importResults.failed,
         skipped: validationFailures.length
       },
       // results: importResults,

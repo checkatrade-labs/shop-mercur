@@ -144,6 +144,14 @@ export const CSVColumn = {
 
   // Images
   MAIN_IMAGE_URL: 'Main Image URL',
+  IMAGE_2: 'Image 2',
+  IMAGE_3: 'Image 3',
+  IMAGE_4: 'Image 4',
+  IMAGE_5: 'Image 5',
+  IMAGE_6: 'Image 6',
+  IMAGE_7: 'Image 7',
+  IMAGE_8: 'Image 8',
+  IMAGE_9: 'Image 9',
 
   // Brand
   BRAND_NAME: 'Brand Name',
@@ -207,109 +215,109 @@ export const CSVColumn = {
 
 export interface CSVRow {
   // Status & Actions
-  'Status': string
-  'Listing Action': string
+  [CSVColumn.STATUS]: string
+  [CSVColumn.LISTING_ACTION]: string
 
   // Product Info
-  'Product Name': string
-  'SKU': string
-  'Product Type': string
-  'Product Description': string
-  'Bullet Points': string
+  [CSVColumn.PRODUCT_NAME]: string
+  [CSVColumn.SKU]: string
+  [CSVColumn.PRODUCT_TYPE]: string
+  [CSVColumn.PRODUCT_DESCRIPTION]: string
+  [CSVColumn.BULLET_POINTS]: string
 
   // Brand & Manufacturer
-  'Brand Name': string
-  'Manufacturer': string
+  [CSVColumn.BRAND_NAME]: string
+  [CSVColumn.MANUFACTURER]: string
 
   // Product Identifiers
-  'Product ID Type': string
-  'Product ID': string
-  'Part Number': string
+  [CSVColumn.PRODUCT_ID_TYPE]: string
+  [CSVColumn.PRODUCT_ID]: string
+  [CSVColumn.PART_NUMBER]: string
 
   // Pricing
-  'Original Trade Price (inc VAT)': string
-  'Trade Sell Price (inc VAT)': string
-  'Original Consumer Price (inc VAT)': string
-  'Consumer Sell Price (inc VAT)': string
-  'VAT %': string
+  [CSVColumn.ORIGINAL_TRADE_PRICE]: string
+  [CSVColumn.TRADE_SELL_PRICE]: string
+  [CSVColumn.ORIGINAL_CONSUMER_PRICE]: string
+  [CSVColumn.CONSUMER_SELL_PRICE]: string
+  [CSVColumn.VAT_PERCENT]: string
 
   // Quantity
-  'Qty Available': string
+  [CSVColumn.QTY_AVAILABLE]: string
 
   // Units
-  'Units per Product': string
-  'Unit Measurement': string
-  'Packs per Product': string
+  [CSVColumn.UNITS_PER_PRODUCT]: string
+  [CSVColumn.UNIT_MEASUREMENT]: string
+  [CSVColumn.PACKS_PER_PRODUCT]: string
 
   // Features & Components
-  'Included Components': string
-  'Special Features_1': string
-  'Special Features_2': string
-  'Special Features_3': string
-  'Special Features_4': string
-  'Special Features_5': string
+  [CSVColumn.INCLUDED_COMPONENTS]: string
+  [CSVColumn.SPECIAL_FEATURES_1]: string
+  [CSVColumn.SPECIAL_FEATURES_2]: string
+  [CSVColumn.SPECIAL_FEATURES_3]: string
+  [CSVColumn.SPECIAL_FEATURES_4]: string
+  [CSVColumn.SPECIAL_FEATURES_5]: string
 
   // Parentage
-  'Parentage Level': ParentageLevelType
-  'Parent SKU': string
-  'Variation Theme Name': string
+  [CSVColumn.PARENTAGE_LEVEL]: ParentageLevelType
+  [CSVColumn.PARENT_SKU]: string
+  [CSVColumn.VARIATION_THEME_NAME]: string
 
   // Variant Info
-  'Colour': string
-  'Size': string
-  'Style': string
-  'Material': string
-  'Edge': string
-  'Shape': string
-  'Finish': string
+  [CSVColumn.COLOUR]: string
+  [CSVColumn.SIZE]: string
+  [CSVColumn.STYLE]: string
+  [CSVColumn.MATERIAL]: string
+  [CSVColumn.EDGE]: string
+  [CSVColumn.SHAPE]: string
+  [CSVColumn.FINISH]: string
 
   // Images
-  'Main Image URL': string
-  'Image 2': string
-  'Image 3': string
-  'Image 4': string
-  'Image 5': string
-  'Image 6': string
-  'Image 7': string
-  'Image 8': string
-  'Image 9': string
+  [CSVColumn.MAIN_IMAGE_URL]: string
+  [CSVColumn.IMAGE_2]: string
+  [CSVColumn.IMAGE_3]: string
+  [CSVColumn.IMAGE_4]: string
+  [CSVColumn.IMAGE_5]: string
+  [CSVColumn.IMAGE_6]: string
+  [CSVColumn.IMAGE_7]: string
+  [CSVColumn.IMAGE_8]: string
+  [CSVColumn.IMAGE_9]: string
 
   // Restrictions
-  'Age Restricted': string
+  [CSVColumn.AGE_RESTRICTED]: string
 
   // Product Dimensions
-  'Product Length Range': string
-  'Product Length': string
-  'Product Length Unit': string
-  'Product Width Range': string
-  'Product Width': string
-  'Product Width Unit': string
-  'Product Thickness': string
-  'Product Thickness Unit': string
-  'Product Height': string
-  'Product Height Unit': string
+  [CSVColumn.PRODUCT_LENGTH_RANGE]: string
+  [CSVColumn.PRODUCT_LENGTH]: string
+  [CSVColumn.PRODUCT_LENGTH_UNIT]: string
+  [CSVColumn.PRODUCT_WIDTH_RANGE]: string
+  [CSVColumn.PRODUCT_WIDTH]: string
+  [CSVColumn.PRODUCT_WIDTH_UNIT]: string
+  [CSVColumn.PRODUCT_THICKNESS]: string
+  [CSVColumn.PRODUCT_THICKNESS_UNIT]: string
+  [CSVColumn.PRODUCT_HEIGHT]: string
+  [CSVColumn.PRODUCT_HEIGHT_UNIT]: string
 
   // Product Weight
-  'Product Weight': string
-  'Product Weight Unit': string
+  [CSVColumn.PRODUCT_WEIGHT]: string
+  [CSVColumn.PRODUCT_WEIGHT_UNIT]: string
 
   // Package Dimensions
-  'Package Length': string
-  'Package Length Unit': string
-  'Package Width': string
-  'Package Width Unit': string
-  'Package Height': string
-  'Package Height Unit': string
-  'Package Weight': string
-  'Package Weight Unit': string
+  [CSVColumn.PACKAGE_LENGTH]: string
+  [CSVColumn.PACKAGE_LENGTH_UNIT]: string
+  [CSVColumn.PACKAGE_WIDTH]: string
+  [CSVColumn.PACKAGE_WIDTH_UNIT]: string
+  [CSVColumn.PACKAGE_HEIGHT]: string
+  [CSVColumn.PACKAGE_HEIGHT_UNIT]: string
+  [CSVColumn.PACKAGE_WEIGHT]: string
+  [CSVColumn.PACKAGE_WEIGHT_UNIT]: string
 
   // Additional Info
-  'Country of origin': string
-  'No of Boxes': string
-  'Delivery Time': string
-  'Delivery Time Unit': string
-  'Item form': string
-  'Installation Type': string
+  [CSVColumn.COUNTRY_OF_ORIGIN]: string
+  [CSVColumn.NO_OF_BOXES]: string
+  [CSVColumn.DELIVERY_TIME]: string
+  [CSVColumn.DELIVERY_TIME_UNIT]: string
+  [CSVColumn.ITEM_FORM]: string
+  [CSVColumn.INSTALLATION_TYPE]: string
 
   // Additional fields that might exist
   [key: string]: string
@@ -333,7 +341,7 @@ export function groupByParentSKU(rows: CSVRow[], logger: Logger): ParentGroup[] 
   
   // First pass: collect all rows and identify parent rows
   for (const row of rows) {
-    logger.debug('Parentage Level: ' + JSON.stringify(row['Parentage Level'], null, 2))
+    logger.debug('Parentage Level: ' + JSON.stringify(row[CSVColumn.PARENTAGE_LEVEL], null, 2))
     let parentSKU = row[CSVColumn.PARENT_SKU]
 
     // If no Parent SKU, treat as standalone product (use own SKU as parent)
@@ -442,8 +450,17 @@ export function extractImages(row: CSVRow): string[] {
   }
   
   // Additional images (Image 2-9)
-  for (let i = 2; i <= 9; i++) {
-    const imgKey = `Image ${i}`
+  const additionalImageColumns = [
+    CSVColumn.IMAGE_2,
+    CSVColumn.IMAGE_3,
+    CSVColumn.IMAGE_4,
+    CSVColumn.IMAGE_5,
+    CSVColumn.IMAGE_6,
+    CSVColumn.IMAGE_7,
+    CSVColumn.IMAGE_8,
+    CSVColumn.IMAGE_9
+  ] as const
+  for (const imgKey of additionalImageColumns) {
     if (row[imgKey]) {
       const normalizedUrl = normalizeImageUrl(row[imgKey])
       if (normalizedUrl) {
