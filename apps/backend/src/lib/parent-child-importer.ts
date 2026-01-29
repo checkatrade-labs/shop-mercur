@@ -42,7 +42,7 @@ export async function importParentGroup(
   error?: string
 }> {
   const { parentRow, childRows, parentSKU } = group
-  const { sellerId, stockLocationId, salesChannelId, regionId } = context
+  const { sellerId, stockLocationId, salesChannelId } = context
 
   logger.debug(`\n🔍 [DEBUG] Starting import of parent product: ${parentSKU}`)
   
@@ -169,7 +169,7 @@ export async function importParentGroup(
     const allImageUrls = new Set<string>(parentImageUrls)
     
     // Also collect images from each child row (variant-specific images)
-    childRows.forEach((childRow, idx) => {
+    childRows.forEach((childRow) => {
       const childImages = extractImages(childRow)
       childImages.forEach(url => allImageUrls.add(url))
     })
@@ -232,7 +232,7 @@ export async function importParentGroup(
     
     // Parse variation theme into parts (split by /, -, or space)
     const variationParts = variationTheme
-      .split(/[\/\-\s]+/)
+      .split(/[/\-\s]+/)
       .map(part => part.trim())
       .filter(part => part.length > 0)
     
@@ -283,9 +283,6 @@ export async function importParentGroup(
       })
     })
 
-    // Extract unit measurement from parent row or first child row
-    const unitMeasurement = parentRow[CSVColumn.UNIT_MEASUREMENT] || childRows[0]?.[CSVColumn.UNIT_MEASUREMENT] || ''
-    
     logger.debug(`${parentSKU}] Variation theme: "${variationTheme}"`)
     logger.debug(`${parentSKU}] Found ${childRows.length} child rows (variants)`)
     logger.debug(`${parentSKU}] Unique values: Colors=${colors.size}, Sizes=${sizes.size}, Styles=${styles.size}, Quantities=${quantities.size}`)
@@ -320,7 +317,6 @@ export async function importParentGroup(
         logger.debug(`${parentSKU}] First child row Product Name value: "${childRow[CSVColumn.PRODUCT_NAME] || 'NOT FOUND'}"`)
       }
       const price = extractPrice(childRow)
-      const quantity = extractQuantity(childRow)
       
       // Extract attributes based on variation theme using dynamic column mapping
       const variationValues: Record<string, string> = {}
@@ -331,9 +327,6 @@ export async function importParentGroup(
         }
       })
       
-      const unitsPerProduct = childRow[CSVColumn.UNITS_PER_PRODUCT] || ''
-      const unitMeasurement = childRow[CSVColumn.UNIT_MEASUREMENT] || ''
-
       // PRIORITY: Use Product Name field from CSV directly - this is the full product title from CSV
       // The Product Name column in child rows contains the complete product title for that variant
       let variantTitle: string | null = null
@@ -565,8 +558,8 @@ export async function importParentGroup(
       if (data && data.length > 0) {
         existingProduct = data[0]
       }
-    } catch (err) {
-      // Product doesn't exist, continue
+    } catch (error: any) {
+      logger.warn(`${parentSKU}] ⚠️  Could not find existing product: ${error.message}`)
     }
     
     // Check for existing variants by SKU
@@ -587,8 +580,8 @@ export async function importParentGroup(
             }
           })
         }
-      } catch (err) {
-        // No existing variants found
+      } catch (error: any) {
+        logger.warn(`${parentSKU}] ⚠️  Could not find existing variants: ${error.message}`)
       }
     }
 
@@ -980,7 +973,7 @@ export async function importParentGroup(
             })
           }
         } catch (linkError: any) {
-          // Link error - non-fatal
+          logger.warn(`${parentSKU}] ⚠️  Could not link inventory item to seller: ${linkError.message}`)
         }
 
         // Link inventory item to variant
@@ -1010,7 +1003,7 @@ export async function importParentGroup(
           ])
         }
       } catch (invError: any) {
-        // Inventory error - non-fatal
+        logger.warn(`${parentSKU}] ⚠️  Could not create inventory level: ${invError.message}`)
       }
     }
 

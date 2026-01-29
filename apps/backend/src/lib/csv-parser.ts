@@ -47,7 +47,7 @@ export function normalizeCSVRow(row: any): CSVRow {
   const columnMapping = createColumnMapping(row)
 
   // Map each expected column to its value from the CSV
-  for (const [constantKey, expectedColumnName] of Object.entries(CSVColumn)) {
+  for (const expectedColumnName of Object.values(CSVColumn)) {
     const normalizedExpected = normalizeColumnName(expectedColumnName)
     const actualColumnName = columnMapping.get(normalizedExpected)
 
@@ -106,6 +106,87 @@ export const ProductStatus = {
 } as const
 
 export type ProductStatusType = typeof ProductStatus[keyof typeof ProductStatus]
+
+export const ProductListingAction = {
+  CREATE_OR_REPLACE: 'Create or Replace (Full Update)',
+  EDIT: 'Edit (Partial Update)',
+  DELETE: 'Delete',
+  NO_ACTION: 'No action'
+} as const
+
+export type ProductListingActionType = typeof ProductListingAction[keyof typeof ProductListingAction]
+
+export const ProductVariationTheme = {
+  // Single attributes
+  COLOUR: 'Colour',
+  SIZE: 'Size',
+  STYLE: 'Style',
+  MATERIAL: 'Material',
+  FINISH: 'Finish',
+  PATTERN: 'Pattern',
+  CAPACITY: 'Capacity',
+  VOLUME: 'Volume',
+  LENGTH: 'Length',
+  WIDTH: 'Width',
+  HEIGHT: 'Height',
+  DIMENSIONS: 'Dimensions',
+  SHAPE: 'Shape',
+  WATTAGE: 'Wattage',
+  VOLTAGE: 'Voltage',
+  LUMENS: 'Lumens',
+  TEMPERATURE: 'Temperature',
+  PACK_SIZE: 'Pack_Size',
+  UNIT_COUNT: 'Unit_Count',
+  THICKNESS: 'Thickness',
+  GRIT: 'Grit',
+  POWER: 'Power',
+  FLAVOR: 'Flavor',
+  SCENT: 'Scent',
+  // Two attributes
+  COLOUR_SIZE: 'Colour/Size',
+  COLOUR_STYLE: 'Colour/Style',
+  COLOUR_MATERIAL: 'Colour/Material',
+  COLOUR_FINISH: 'Colour/Finish',
+  COLOUR_PATTERN: 'Colour/Pattern',
+  COLOUR_SHAPE: 'Colour/Shape',
+  SIZE_STYLE: 'Size/Style',
+  SIZE_MATERIAL: 'Size/Material',
+  SIZE_FINISH: 'Size/Finish',
+  SIZE_PATTERN: 'Size/Pattern',
+  SIZE_DIMENSIONS: 'Size/Dimensions',
+  STYLE_MATERIAL: 'Style/Material',
+  STYLE_FINISH: 'Style/Finish',
+  MATERIAL_FINISH: 'Material/Finish',
+  MATERIAL_THICKNESS: 'Material/Thickness',
+  MATERIAL_SIZE: 'Material/Size',
+  SIZE_THICKNESS: 'Size/Thickness',
+  LENGTH_WIDTH: 'Length/Width',
+  LENGTH_THICKNESS: 'Length/Thickness',
+  WIDTH_THICKNESS: 'Width/Thickness',
+  WATTAGE_COLOUR: 'Wattage/Colour',
+  WATTAGE_CAP_TYPE: 'Wattage/CapType',
+  WATTAGE_TEMPERATURE: 'Wattage/Temperature',
+  VOLTAGE_WATTAGE: 'Voltage/Wattage',
+  UNIT_COUNT_SIZE: 'UnitCount/Size',
+  PATTERN_COLOUR: 'Pattern/Colour',
+  SHAPE_SIZE: 'Shape/Size',
+  // Three attributes
+  COLOUR_SIZE_STYLE: 'Colour/Size/Style',
+  COLOUR_SIZE_MATERIAL: 'Colour/Size/Material',
+  COLOUR_SIZE_FINISH: 'Colour/Size/Finish',
+  COLOUR_MATERIAL_FINISH: 'Colour/Material/Finish',
+  SIZE_MATERIAL_FINISH: 'Size/Material/Finish',
+  SIZE_LENGTH_WIDTH: 'Size/Length/Width',
+  LENGTH_WIDTH_THICKNESS: 'Length/Width/Thickness',
+  MATERIAL_LENGTH_THICKNESS: 'Material/Length/Thickness',
+  WATTAGE_COLOUR_TEMPERATURE: 'Wattage/Colour/Temperature',
+  WATTAGE_CAP_TYPE_TEMPERATURE: 'Wattage/CapType/Temperature',
+  DIMENSIONS_MATERIAL_COLOUR: 'Dimensions/Material/Colour',
+  UNIT_COUNT_SIZE_COLOUR: 'UnitCount/Size/Colour',
+  PATTERN_COLOUR_SIZE: 'Pattern/Colour/Size'
+} as const
+
+export type ProductVariationThemeType = typeof ProductVariationTheme[keyof typeof ProductVariationTheme]
 
 /**
  * CSV column name constants
@@ -215,8 +296,8 @@ export const CSVColumn = {
 
 export interface CSVRow {
   // Status & Actions
-  [CSVColumn.STATUS]: string
-  [CSVColumn.LISTING_ACTION]: string
+  [CSVColumn.STATUS]: ProductStatusType
+  [CSVColumn.LISTING_ACTION]: ProductListingActionType
 
   // Product Info
   [CSVColumn.PRODUCT_NAME]: string
@@ -260,7 +341,7 @@ export interface CSVRow {
   // Parentage
   [CSVColumn.PARENTAGE_LEVEL]: ParentageLevelType
   [CSVColumn.PARENT_SKU]: string
-  [CSVColumn.VARIATION_THEME_NAME]: string
+  [CSVColumn.VARIATION_THEME_NAME]: ProductVariationThemeType
 
   // Variant Info
   [CSVColumn.COLOUR]: string
