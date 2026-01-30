@@ -201,7 +201,6 @@ export async function importParentGroup(
       }
     }
 
-    console.log('categories: ', JSON.stringify(categories, null, 2))
     const leafCategory = categories[0]
     logger.debug(
       `[${parentSKU}] ✓ Category: "${leafCategory.name}" (ID: ${leafCategory.id})`
@@ -787,28 +786,6 @@ export async function importParentGroup(
       )
       logger.debug(
         `[${parentSKU}] Product description length: ${productDescription.length}${productDescription.length > 0 ? `, value="${productDescription.substring(0, 150)}${productDescription.length > 150 ? '...' : ''}"` : ' (EMPTY)'}`
-      )
-
-      console.log(
-        JSON.stringify(
-          {
-            title: productTitle,
-            description: productDescription,
-            status: 'published',
-            is_giftcard: false,
-            discountable: true,
-            handle,
-            images,
-            category_ids: [leafCategory.id],
-            type_id: productTypeId, // Add product type ID
-            options: productOptions,
-            variants,
-            metadata: extractProductMetadata(parentRow, parentSKU, sellerId),
-            sales_channels: [{ id: salesChannelId }]
-          },
-          null,
-          2
-        )
       )
 
       try {
