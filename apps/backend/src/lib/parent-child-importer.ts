@@ -24,13 +24,35 @@ import {
 } from './csv-parser'
 
 /**
- * Get variant attribute columns from ProductVariationTheme
- * Only includes single attributes (not combinations like 'Colour/Size')
+ * Parse Variation Theme Name and extract column names
+ * Example: "Size/Colour/Packs per Product" -> ["Size", "Colour", "Packs per Product"]
  */
-function getVariantColumns(): string[] {
-  return Object.values(ProductVariationTheme).filter(
-    (value) => !value.includes('/')
-  ) // Only single attributes
+function parseVariationTheme(variationTheme: string): string[] {
+  if (!variationTheme || variationTheme.trim() === '') {
+    return []
+  }
+
+  // Split by "/" and trim each part
+  const parts = variationTheme
+    .split('/')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+
+  // Match each part to ProductVariationTheme values
+  const themeValues = Object.values(ProductVariationTheme)
+  const matchedColumns: string[] = []
+
+  for (const part of parts) {
+    // Try exact match (case-insensitive)
+    const match = themeValues.find(
+      (value) => value.toLowerCase() === part.toLowerCase()
+    )
+    if (match) {
+      matchedColumns.push(match)
+    }
+  }
+
+  return matchedColumns
 }
 
 interface ImportContext {
@@ -248,11 +270,23 @@ export async function importParentGroup(
       )
     }
 
-    // 6. Read Variation Theme Name (kept as metadata only, not parsed)
+    // 6. Read and parse Variation Theme Name
     const variationThemeRaw = parentRow[CSVColumn.VARIATION_THEME_NAME] || ''
+    let variantColumns = parseVariationTheme(variationThemeRaw)
+
+    // If no variation theme or couldn't parse, check all ProductVariationTheme columns
+    if (variantColumns.length === 0) {
+      logger.debug(
+        `[${parentSKU}] No variation theme specified, checking all variant columns`
+      )
+      variantColumns = Object.values(ProductVariationTheme)
+    }
 
     logger.debug(
-      `[${parentSKU}] Variation theme (metadata): "${variationThemeRaw}"`
+      `[${parentSKU}] Variation theme: "${variationThemeRaw}"`
+    )
+    logger.debug(
+      `[${parentSKU}] Variant columns to check: ${variantColumns.join(', ')}`
     )
     logger.debug(
       `[${parentSKU}] Found ${childRows.length} child rows (variants)`
@@ -260,7 +294,6 @@ export async function importParentGroup(
 
     // 7. Detect which variant attribute columns have values in child rows
     // This determines which product options to create
-    const variantColumns = getVariantColumns()
     const attributeValues = new Map<string, Set<string>>()
 
     // Initialize sets for each variant column
