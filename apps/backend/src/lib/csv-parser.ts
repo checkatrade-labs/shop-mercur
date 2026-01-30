@@ -119,7 +119,7 @@ export type ProductListingActionType = typeof ProductListingAction[keyof typeof 
 /**
  * Base variant attributes
  * These are used to parse the Variation Theme Name field
- * Example: "Size/Colour/Packs per Product" splits to ["Size", "Colour", "Packs per Product"]
+ * Example: "Size/Colour/Units per Product" splits to ["Size", "Colour", "Units per Product"]
  */
 export const ProductVariationTheme = {
   COLOUR: 'Colour',
@@ -129,7 +129,7 @@ export const ProductVariationTheme = {
   EDGE: 'Edge',
   SHAPE: 'Shape',
   FINISH: 'Finish',
-  PACKS_PER_PRODUCT: 'Packs per Product',
+  UNITS_PER_PRODUCT: 'Units per Product',
 } as const
 
 export type ProductVariationThemeType = typeof ProductVariationTheme[keyof typeof ProductVariationTheme]
@@ -200,7 +200,6 @@ export const CSVColumn = {
   // Units
   UNITS_PER_PRODUCT: 'Units per Product',
   UNIT_MEASUREMENT: 'Unit Measurement',
-  PACKS_PER_PRODUCT: 'Packs per Product',
 
   // Product Dimensions
   PRODUCT_LENGTH_RANGE: 'Product Length Range',
@@ -274,7 +273,7 @@ export interface CSVRow {
   // Units
   [CSVColumn.UNITS_PER_PRODUCT]: string
   [CSVColumn.UNIT_MEASUREMENT]: string
-  [CSVColumn.PACKS_PER_PRODUCT]: string
+  [CSVColumn.UNITS_PER_PRODUCT]: string
 
   // Features & Components
   [CSVColumn.INCLUDED_COMPONENTS]: string
@@ -520,7 +519,7 @@ export function extractVariantMetadata(row: CSVRow): Record<string, any> {
   // Unit info
   if (row[CSVColumn.UNITS_PER_PRODUCT]) metadata.units_per_product = row[CSVColumn.UNITS_PER_PRODUCT]
   if (row[CSVColumn.UNIT_MEASUREMENT]) metadata.unit_measurement = row[CSVColumn.UNIT_MEASUREMENT]
-  if (row[CSVColumn.PACKS_PER_PRODUCT]) metadata.packs_per_product = row[CSVColumn.PACKS_PER_PRODUCT]
+  if (row[CSVColumn.UNITS_PER_PRODUCT]) metadata.packs_per_product = row[CSVColumn.UNITS_PER_PRODUCT]
 
   // Product Dimensions
   if (row[CSVColumn.PRODUCT_LENGTH_RANGE]) metadata.product_length_range = row[CSVColumn.PRODUCT_LENGTH_RANGE]
@@ -577,7 +576,7 @@ export function extractProductMetadata(row: CSVRow, parentSKU: string, sellerId:
   // Unit info
   if (row[CSVColumn.UNITS_PER_PRODUCT]) metadata.units_per_product = row[CSVColumn.UNITS_PER_PRODUCT]
   if (row[CSVColumn.UNIT_MEASUREMENT]) metadata.unit_measurement = row[CSVColumn.UNIT_MEASUREMENT]
-  if (row[CSVColumn.PACKS_PER_PRODUCT]) metadata.packs_per_product = row[CSVColumn.PACKS_PER_PRODUCT]
+  if (row[CSVColumn.UNITS_PER_PRODUCT]) metadata.packs_per_product = row[CSVColumn.UNITS_PER_PRODUCT]
 
   // Bullet Points
   if (row[CSVColumn.BULLET_POINTS]) metadata.bullet_points = row[CSVColumn.BULLET_POINTS]

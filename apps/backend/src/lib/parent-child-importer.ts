@@ -25,9 +25,13 @@ import {
 
 /**
  * Parse Variation Theme Name and extract column names
- * Example: "Size/Colour/Packs per Product" -> ["Size", "Colour", "Packs per Product"]
+ * Example: "Size/Colour/Units per Product" -> ["Size", "Colour", "Units per Product"]
  */
-function parseVariationTheme(variationTheme: string): string[] {
+function parseVariationTheme(
+  variationTheme: string,
+  logger: Logger,
+  parentSKU: string
+): string[] {
   if (!variationTheme || variationTheme.trim() === '') {
     return []
   }
@@ -49,6 +53,10 @@ function parseVariationTheme(variationTheme: string): string[] {
     )
     if (match) {
       matchedColumns.push(match)
+    } else {
+      logger.warn(
+        `[${parentSKU}] ⚠️  Variation theme attribute "${part}" does not match any ProductVariationTheme value`
+      )
     }
   }
 
@@ -272,7 +280,7 @@ export async function importParentGroup(
 
     // 6. Read and parse Variation Theme Name
     const variationThemeRaw = parentRow[CSVColumn.VARIATION_THEME_NAME] || ''
-    let variantColumns = parseVariationTheme(variationThemeRaw)
+    let variantColumns = parseVariationTheme(variationThemeRaw, logger, parentSKU)
 
     // If no variation theme or couldn't parse, check all ProductVariationTheme columns
     if (variantColumns.length === 0) {
@@ -313,8 +321,8 @@ export async function importParentGroup(
 
     // Determine which attributes are actually used (have values)
     const activeAttributes = Array.from(attributeValues.entries())
-      .filter(([_, values]) => values.size > 0)
-      .map(([column, _]) => column)
+      .filter(([, values]) => values.size > 0)
+      .map(([column]) => column)
 
     logger.debug(`[${parentSKU}] Active variant attributes detected:`)
     for (const column of activeAttributes) {

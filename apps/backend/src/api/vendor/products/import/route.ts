@@ -65,7 +65,7 @@ import { importParentGroups } from '../../../../lib/parent-child-importer'
  * Units:
  * - Units per Product: Number of units
  * - Unit Measurement: Unit measurement type
- * - Packs per Product: Number of packs
+ * - Units per Product: Number of packs
  *
  * Product Dimensions:
  * - Product Length Range: Length range
