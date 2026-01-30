@@ -1,25 +1,37 @@
 /**
  * Parent/Child Product Importer
- * 
+ *
  * Imports products from CSV following Parent/Child structure:
  * - One Parent SKU = One Product
  * - Child SKUs = Variants of that product
- * 
+ *
  * @see Instructions in user documentation
  */
-
 import { Modules } from '@medusajs/framework/utils'
 import { createProductsWorkflow } from '@medusajs/medusa/core-flows'
-import type { ParentGroup, CSVRow } from './csv-parser'
-import { 
-  CSVColumn,
-  extractPrice, 
-  extractQuantity, 
-  extractImages,
-  extractVariantMetadata,
-  extractProductMetadata
-} from './csv-parser'
+import type { Logger } from '@medusajs/types'
+
 import { getCategoryForProductType } from './category-mapping'
+import type { CSVRow, ParentGroup } from './csv-parser'
+import {
+  CSVColumn,
+  ProductVariationTheme,
+  extractImages,
+  extractPrice,
+  extractProductMetadata,
+  extractQuantity,
+  extractVariantMetadata
+} from './csv-parser'
+
+/**
+ * Get variant attribute columns from ProductVariationTheme
+ * Only includes single attributes (not combinations like 'Colour/Size')
+ */
+function getVariantColumns(): string[] {
+  return Object.values(ProductVariationTheme).filter(
+    (value) => !value.includes('/')
+  ) // Only single attributes
+}
 
 interface ImportContext {
   sellerId: string
@@ -34,6 +46,7 @@ interface ImportContext {
 export async function importParentGroup(
   group: ParentGroup,
   context: ImportContext,
+  logger: Logger,
   scope: any
 ): Promise<{
   success: boolean
@@ -41,24 +54,23 @@ export async function importParentGroup(
   error?: string
 }> {
   const { parentRow, childRows, parentSKU } = group
-  const { sellerId, stockLocationId, salesChannelId, regionId } = context
+  const { sellerId, stockLocationId, salesChannelId } = context
 
-  console.log(`\n🔍 [DEBUG] Starting import for product: ${parentSKU}`)
-  
+  logger.debug(`\n🔍 [DEBUG] Starting import of parent product: ${parentSKU}`)
+
   try {
     // 1. Get Product Module
     const productModule = scope.resolve(Modules.PRODUCT)
-    console.log(`   [DEBUG ${parentSKU}] ✓ Product module resolved`)
+    logger.debug(`[${parentSKU}] ✓ Product module resolved`)
 
     // 2. Determine product name and description
     // Product title comes from parent row (this is a parent product with multiple variants)
     // Each variant will have its own title from its child row
-    const productTitle = parentRow[CSVColumn.TITLE] || 
-                        parentRow[CSVColumn.ITEM_NAME] || 
-                        `Product ${parentSKU}`
-    
+    const productTitle =
+      parentRow[CSVColumn.PRODUCT_NAME] || `Product ${parentSKU}`
+
     let productDescription = parentRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
-    
+
     if (!productDescription || productDescription.trim().length === 0) {
       if (childRows.length > 0) {
         // Try first child row
@@ -77,23 +89,37 @@ export async function importParentGroup(
         }
       }
     }
-    
-    console.log(`   [DEBUG ${parentSKU}] Product title: "${productTitle}" (from parent row)`)
+
+    logger.debug(
+      `[${parentSKU}] Product title: "${productTitle}" (from parent row)`
+    )
 
     // 3. Get category mapping for this product type
     const productType = parentRow['Product Type']
-    console.log(`   [DEBUG ${parentSKU}] Product type from CSV: "${productType}" (type: ${typeof productType}, length: ${productType?.length})`)
-    console.log(`   [DEBUG ${parentSKU}] Product type normalized: "${productType?.toUpperCase().trim().replace(/[^A-Z0-9_&]/g, '_').replace(/_+/g, '_')}"`)
+    logger.debug(
+      `[${parentSKU}] Product type from CSV: "${productType}" (type: ${typeof productType}, length: ${productType?.length})`
+    )
+    logger.debug(
+      `[${parentSKU}] Product type normalized: "${productType
+        ?.toUpperCase()
+        .trim()
+        .replace(/[^A-Z0-9_&]/g, '_')
+        .replace(/_+/g, '_')}"`
+    )
     const categoryMapping = getCategoryForProductType(productType)
 
     if (!categoryMapping) {
-      console.error(`   [DEBUG ${parentSKU}] ❌ No category mapping found for product type: "${productType}"`)
+      logger.error(
+        `[${parentSKU}] ❌ No category mapping found for product type: "${productType}"`
+      )
       return {
         success: false,
         error: `No category mapping for product type: ${productType}`
       }
     }
-    console.log(`   [DEBUG ${parentSKU}] ✓ Category mapping found: ${categoryMapping.level1} > ${categoryMapping.level2} > ${categoryMapping.level3}`)
+    logger.debug(
+      `[${parentSKU}] ✓ Category mapping found: ${categoryMapping.level1} > ${categoryMapping.level2} > ${categoryMapping.level3}`
+    )
 
     // 4. Find the leaf category (level 3)
     // IMPORTANT: Products should be linked to level 2 (subcategory) if level 3 doesn't exist
@@ -104,50 +130,82 @@ export async function importParentGroup(
 
     // If not found, try case-insensitive search
     if (!categories || categories.length === 0) {
-      const allCategories = await productModule.listProductCategories({}, { take: 9999 })
-      categories = allCategories.filter((cat: any) => 
-        cat.name.toLowerCase().trim() === categoryMapping.level3.toLowerCase().trim()
+      const allCategories = await productModule.listProductCategories(
+        {},
+        { take: 9999 }
+      )
+      categories = allCategories.filter(
+        (cat: any) =>
+          cat.name.toLowerCase().trim() ===
+          categoryMapping.level3.toLowerCase().trim()
       )
     }
 
     // If level 3 not found, try to find level 2 (subcategory) instead
     if (!categories || categories.length === 0) {
-      console.log(`   [DEBUG ${parentSKU}] ⚠️  Level 3 category "${categoryMapping.level3}" not found, trying level 2: "${categoryMapping.level2}"`)
+      logger.debug(
+        `[${parentSKU}] ⚠️  Level 3 category "${categoryMapping.level3}" not found, trying level 2: "${categoryMapping.level2}"`
+      )
       categories = await productModule.listProductCategories({
         name: categoryMapping.level2
       })
-      
+
       if (!categories || categories.length === 0) {
-        const allCategories = await productModule.listProductCategories({}, { take: 9999 })
-        categories = allCategories.filter((cat: any) => 
-          cat.name.toLowerCase().trim() === categoryMapping.level2.toLowerCase().trim()
+        const allCategories = await productModule.listProductCategories(
+          {},
+          { take: 9999 }
+        )
+        categories = allCategories.filter(
+          (cat: any) =>
+            cat.name.toLowerCase().trim() ===
+            categoryMapping.level2.toLowerCase().trim()
         )
       }
     }
 
     // If still not found, try searching by handle
     if (!categories || categories.length === 0) {
-      const handle = (categories.length === 0 ? categoryMapping.level3 : categoryMapping.level2)
-        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-      const allCategories = await productModule.listProductCategories({}, { take: 9999 })
-      categories = allCategories.filter((cat: any) => 
-        cat.handle === handle || cat.handle?.includes(handle) || handle.includes(cat.handle)
+      const handle = (
+        categories.length === 0
+          ? categoryMapping.level3
+          : categoryMapping.level2
+      )
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+      const allCategories = await productModule.listProductCategories(
+        {},
+        { take: 9999 }
+      )
+      categories = allCategories.filter(
+        (cat: any) =>
+          cat.handle === handle ||
+          cat.handle?.includes(handle) ||
+          handle.includes(cat.handle)
       )
     }
 
     if (!categories || categories.length === 0) {
-      console.error(`   [DEBUG ${parentSKU}] ❌ Category not found: "${categoryMapping.level3}" or "${categoryMapping.level2}"`)
-      console.error(`   [DEBUG ${parentSKU}]    Hierarchy: ${categoryMapping.level1} > ${categoryMapping.level2} > ${categoryMapping.level3}`)
-      console.error(`   [DEBUG ${parentSKU}]    Please run the seed script at /seed-ui to create missing categories`)
+      logger.error(
+        `[${parentSKU}] ❌ Category not found: "${categoryMapping.level3}" or "${categoryMapping.level2}"`
+      )
+      logger.error(
+        `[${parentSKU}]    Hierarchy: ${categoryMapping.level1} > ${categoryMapping.level2} > ${categoryMapping.level3}`
+      )
+      logger.error(
+        `[${parentSKU}]    Please run the seed script at /seed-ui to create missing categories`
+      )
       return {
         success: false,
         error: `Category not found: ${categoryMapping.level3} or ${categoryMapping.level2}. Please run the seed script at /seed-ui to create missing categories.`
       }
     }
 
+    console.log('categories: ', JSON.stringify(categories, null, 2))
     const leafCategory = categories[0]
-    console.log(`   [DEBUG ${parentSKU}] ✓ Found category: "${leafCategory.name}" (ID: ${leafCategory.id})`)
-    console.log(`   [DEBUG ${parentSKU}] ✓ Category found: "${leafCategory.name}" (ID: ${leafCategory.id})`)
+    logger.debug(
+      `[${parentSKU}] ✓ Category: "${leafCategory.name}" (ID: ${leafCategory.id})`
+    )
 
     // 4b. Find product type ID
     let productTypeId: string | undefined
@@ -157,9 +215,11 @@ export async function importParentGroup(
       })
       if (productTypes && productTypes.length > 0) {
         productTypeId = productTypes[0].id
-        console.log(`   [DEBUG ${parentSKU}] ✓ Product type ID found: ${productTypeId}`)
+        logger.debug(`[${parentSKU}] ✓ Product type ID found: ${productTypeId}`)
       } else {
-        console.log(`   [DEBUG ${parentSKU}] ⚠️  Product type "${productType}" not found in database, continuing without type ID`)
+        logger.debug(
+          `[${parentSKU}] ⚠️  Product type "${productType}" not found in database, continuing without type ID`
+        )
       }
     }
 
@@ -167,274 +227,181 @@ export async function importParentGroup(
     // Collect images from parent row AND all child rows (variants may have their own images)
     const parentImageUrls = extractImages(parentRow)
     const allImageUrls = new Set<string>(parentImageUrls)
-    
+
     // Also collect images from each child row (variant-specific images)
-    childRows.forEach((childRow, idx) => {
+    childRows.forEach((childRow) => {
       const childImages = extractImages(childRow)
-      childImages.forEach(url => allImageUrls.add(url))
+      childImages.forEach((url) => allImageUrls.add(url))
     })
-    
-    const images: { url: string }[] = Array.from(allImageUrls).map(url => ({ url }))
-    console.log(`   [DEBUG ${parentSKU}] Collected ${images.length} unique images from parent and ${childRows.length} child rows`)
+
+    const images: { url: string }[] = Array.from(allImageUrls).map((url) => ({
+      url
+    }))
+    logger.debug(
+      `[${parentSKU}] Collected ${images.length} unique images from parent and ${childRows.length} child rows`
+    )
     if (images.length > 0) {
-      console.log(`   [DEBUG ${parentSKU}] Image URLs: ${images.slice(0, 5).map(img => img.url).join(', ')}${images.length > 5 ? '...' : ''}`)
+      logger.debug(
+        `[${parentSKU}] Image URLs: ${images
+          .slice(0, 5)
+          .map((img) => img.url)
+          .join(', ')}${images.length > 5 ? '...' : ''}`
+      )
     }
 
-    // 6. Read Variation Theme Name to determine how to create options
-    const variationTheme = (parentRow['Variation Theme Name'] || '').toUpperCase()
-    
-    /**
-     * Helper function to map variation theme parts to CSV column names
-     * Handles cases like "STYLE/SIZE" where each part maps to a different column
-     */
-    const getColumnForVariationPart = (variationPart: string, availableColumns: string[]): string | null => {
-      const normalizedPart = variationPart.trim().toUpperCase()
-      
-      // Direct mappings for common cases
-      const directMappings: Record<string, string> = {
-        'COLOR': 'Colour',
-        'COLOUR': 'Colour',
-        'SIZE': 'Size',
-        'STYLE': 'Style',
-        'ITEM_PACKAGE_QUANTITY': 'Unit Count',
-        'QUANTITY': 'Unit Count',
-      }
-      
-      // Check direct mapping first
-      if (directMappings[normalizedPart]) {
-        const mappedColumn = directMappings[normalizedPart]
-        if (availableColumns.includes(mappedColumn)) {
-          return mappedColumn
-        }
-      }
-      
-      // Try to find a column that matches the variation part (case-insensitive)
-      // First try exact match (case-insensitive)
-      const exactMatch = availableColumns.find(col => 
-        col.toUpperCase() === normalizedPart
-      )
-      if (exactMatch) return exactMatch
-      
-      // Try partial match (e.g., "STYLE" matches "Style Name" or "Product Style")
-      const partialMatch = availableColumns.find(col => 
-        col.toUpperCase().includes(normalizedPart) || 
-        normalizedPart.includes(col.toUpperCase())
-      )
-      if (partialMatch) return partialMatch
-      
-      // No match found
-      return null
+    // 6. Read Variation Theme Name (kept as metadata only, not parsed)
+    const variationThemeRaw = parentRow[CSVColumn.VARIATION_THEME_NAME] || ''
+
+    logger.debug(
+      `[${parentSKU}] Variation theme (metadata): "${variationThemeRaw}"`
+    )
+    logger.debug(
+      `[${parentSKU}] Found ${childRows.length} child rows (variants)`
+    )
+
+    // 7. Detect which variant attribute columns have values in child rows
+    // This determines which product options to create
+    const variantColumns = getVariantColumns()
+    const attributeValues = new Map<string, Set<string>>()
+
+    // Initialize sets for each variant column
+    for (const column of variantColumns) {
+      attributeValues.set(column, new Set<string>())
     }
-    
-    // Parse variation theme into parts (split by /, -, or space)
-    const variationParts = variationTheme
-      .split(/[\/\-\s]+/)
-      .map(part => part.trim())
-      .filter(part => part.length > 0)
-    
-    // Get available columns from first child row (all rows should have same columns)
-    const availableColumns = childRows.length > 0 
-      ? Object.keys(childRows[0]) 
-      : Object.keys(parentRow)
-    
-    console.log(`   [DEBUG ${parentSKU}] Available CSV columns: ${availableColumns.join(', ')}`)
-    console.log(`   [DEBUG ${parentSKU}] Variation theme parts: ${variationParts.join(', ')}`)
-    
-    // Map each variation part to its CSV column
-    const variationColumnMap: Record<string, string> = {}
-    
-    variationParts.forEach(part => {
-      const column = getColumnForVariationPart(part, availableColumns)
-      if (column) {
-        variationColumnMap[part] = column
-        console.log(`   [DEBUG ${parentSKU}] Mapped variation part "${part}" → CSV column "${column}"`)
-      } else {
-        console.warn(`   [DEBUG ${parentSKU}] ⚠️  Could not find CSV column for variation part "${part}"`)
-      }
-    })
-    
-    // 7. Extract unique values based on variation theme using dynamic column mapping
-    const colors = new Set<string>()
-    const sizes = new Set<string>()
-    const styles = new Set<string>()
-    const quantities = new Set<string>()
-    
-    childRows.forEach(row => {
-      variationParts.forEach(part => {
-        const column = variationColumnMap[part]
-        if (column && row[column]) {
-          const value = row[column].trim()
-          if (value) {
-            if (part.includes('COLOR') || part.includes('COLOUR')) {
-              colors.add(value)
-            } else if (part.includes('SIZE') && !part.includes('STYLE')) {
-              sizes.add(value)
-            } else if (part.includes('STYLE')) {
-              styles.add(value)
-            } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
-              quantities.add(value)
-            }
-          }
+
+    // Collect unique values from child rows for each variant column
+    childRows.forEach((row) => {
+      for (const column of variantColumns) {
+        const value = (row[column] || '').trim()
+        if (value) {
+          attributeValues.get(column)!.add(value)
         }
-      })
+      }
     })
 
-    // Extract unit count type from parent row or first child row
-    const unitCountType = parentRow['Unit Count Type'] || childRows[0]?.['Unit Count Type'] || ''
-    
-    console.log(`   [DEBUG ${parentSKU}] Variation theme: "${variationTheme}"`)
-    console.log(`   [DEBUG ${parentSKU}] Found ${childRows.length} child rows (variants)`)
-    console.log(`   [DEBUG ${parentSKU}] Unique values: Colors=${colors.size}, Sizes=${sizes.size}, Styles=${styles.size}, Quantities=${quantities.size}`)
+    // Determine which attributes are actually used (have values)
+    const activeAttributes = Array.from(attributeValues.entries())
+      .filter(([_, values]) => values.size > 0)
+      .map(([column, _]) => column)
+
+    logger.debug(`[${parentSKU}] Active variant attributes detected:`)
+    for (const column of activeAttributes) {
+      const values = attributeValues.get(column)!
+      logger.debug(`[${parentSKU}]   - ${column}: ${values.size} unique values`)
+    }
 
     // 8. Create variants from child rows
-    // First, filter out variants that are missing required option values
+    // Only include child rows that have values for ALL active attributes
     const validChildRows = childRows.filter((childRow) => {
-      // Check each variation part has a value
-      for (const part of variationParts) {
-        const column = variationColumnMap[part]
-        if (column) {
-          const value = (childRow[column] || '').trim()
-          if (!value) {
-            console.warn(`   [DEBUG ${parentSKU}] ⚠️  Skipping variant ${childRow[CSVColumn.SKU]}: missing value for "${part}" (column: "${column}")`)
-            return false
-          }
+      // Check if this row has values for all active attributes
+      for (const column of activeAttributes) {
+        const value = (childRow[column] || '').trim()
+        if (!value) {
+          logger.warn(
+            `[${parentSKU}] ⚠️  Skipping variant ${childRow[CSVColumn.SKU]}: missing value for "${column}"`
+          )
+          return false
         }
       }
       return true
     })
-    
+
     if (validChildRows.length < childRows.length) {
-      console.warn(`   [DEBUG ${parentSKU}] ⚠️  Filtered out ${childRows.length - validChildRows.length} variants with missing option values`)
+      logger.warn(
+        `[${parentSKU}] ⚠️  Filtered out ${childRows.length - validChildRows.length} variants with missing attribute values`
+      )
     }
-    
+
     let variants = validChildRows.map((childRow, index) => {
       const sku = childRow[CSVColumn.SKU]
-      
+
       // Debug: Log available columns for first child row to help diagnose CSV parsing issues
       if (index === 0) {
-        console.log(`   [DEBUG ${parentSKU}] First child row columns: ${Object.keys(childRow).join(', ')}`)
-        console.log(`   [DEBUG ${parentSKU}] First child row Title value: "${childRow[CSVColumn.TITLE] || childRow['Title'] || 'NOT FOUND'}"`)
-        console.log(`   [DEBUG ${parentSKU}] First child row Item Name value: "${childRow[CSVColumn.ITEM_NAME] || childRow['Item Name'] || 'NOT FOUND'}"`)
+        logger.debug(
+          `[${parentSKU}] First child row columns: ${Object.keys(childRow).join(', ')}`
+        )
+        logger.debug(
+          `[${parentSKU}] First child row Product Name value: "${childRow[CSVColumn.PRODUCT_NAME] || 'NOT FOUND'}"`
+        )
       }
       const price = extractPrice(childRow)
-      const quantity = extractQuantity(childRow)
-      
-      // Extract attributes based on variation theme using dynamic column mapping
-      const variationValues: Record<string, string> = {}
-      variationParts.forEach(part => {
-        const column = variationColumnMap[part]
-        if (column) {
-          variationValues[part] = (childRow[column] || '').trim()
-        }
-      })
-      
-      const unitCount = childRow['Unit Count'] || ''
-      const unitCountType = childRow['Unit Count Type'] || ''
 
-      // PRIORITY: Use Title field from CSV directly - this is the full product title from CSV
-      // The Title column in child rows contains the complete product title for that variant
+      // PRIORITY: Use Product Name field from CSV directly - this is the full product title from CSV
+      // The Product Name column in child rows contains the complete product title for that variant
       let variantTitle: string | null = null
-      
-      // Get Title column directly - only use "Title"
-      const titleValue = childRow['Title']
-      if (titleValue && typeof titleValue === 'string' && titleValue.trim() !== '') {
-        variantTitle = titleValue.trim()
-        console.log(`   [DEBUG ${parentSKU}] Variant ${sku}: Found title from "Title" column: "${variantTitle}"`)
+
+      // Get Product Name column directly
+      const productNameValue = childRow[CSVColumn.PRODUCT_NAME]
+      if (
+        productNameValue &&
+        typeof productNameValue === 'string' &&
+        productNameValue.trim() !== ''
+      ) {
+        variantTitle = productNameValue.trim()
+        logger.debug(
+          `[${parentSKU}] Variant ${sku}: Found title from "Product Name" column: "${variantTitle}"`
+        )
       }
-      
-      // Fallback to Item Name if Title is not found
-      if (!variantTitle) {
-        const itemNameValue = childRow['Item Name']
-        if (itemNameValue && typeof itemNameValue === 'string' && itemNameValue.trim() !== '') {
-          variantTitle = itemNameValue.trim()
-          console.log(`   [DEBUG ${parentSKU}] Variant ${sku}: Found title from "Item Name" column: "${variantTitle}"`)
-        }
-      }
-      
+
       // LAST RESORT: Only construct from parts if no CSV title found
       if (!variantTitle || variantTitle.trim() === '') {
-        console.warn(`   [DEBUG ${parentSKU}] ⚠️  Variant ${sku}: No Title or Item Name found in CSV. Available columns: ${Object.keys(childRow).join(', ')}`)
-        console.warn(`   [DEBUG ${parentSKU}] ⚠️  Falling back to constructing title from parts`)
-        
-        variantTitle = productTitle
-        const titleParts = [sku]
-        
-        // Add variation values to title parts
-        variationParts.forEach(part => {
-          const value = variationValues[part]
-          if (value) {
-            titleParts.push(value)
-          }
-        })
-        
-        if (titleParts.length > 1) {
-          variantTitle = titleParts.join(' - ')
-        } else {
-          variantTitle = `${productTitle} - ${sku}`
-        }
-        console.log(`   [DEBUG ${parentSKU}] Variant ${sku}: Constructed title: "${variantTitle}"`)
+        logger.warn(
+          `[${parentSKU}] ⚠️  Variant ${sku}: No Product Name found in CSV. Available columns: ${Object.keys(childRow).join(', ')}`
+        )
+        logger.warn(
+          `[${parentSKU}] ⚠️  Falling back to constructing title from parent title + SKU`
+        )
+
+        variantTitle = `${productTitle} - ${sku}`
+        logger.debug(
+          `[${parentSKU}] Variant ${sku}: Constructed title: "${variantTitle}"`
+        )
       } else {
         // Use the CSV title directly - this is what the user wants
         variantTitle = variantTitle.trim()
-        console.log(`   [DEBUG ${parentSKU}] ✓ Variant ${sku}: Using CSV title: "${variantTitle}"`)
+        logger.debug(
+          `[${parentSKU}] ✓ Variant ${sku}: Using CSV title: "${variantTitle}"`
+        )
       }
 
-      // Build options object based on variation theme
-      // IMPORTANT: If a product has multiple options, ALL options MUST have values for each variant
-      // We've already filtered out variants missing required values, so these should all have values
+      // Build options object based on active attributes
       const options: Record<string, string> = {}
-      
-      // Use dynamic mapping to build options
-      variationParts.forEach(part => {
-        const value = variationValues[part]
+
+      for (const column of activeAttributes) {
+        const value = (childRow[column] || '').trim()
         if (value) {
-          // Map variation part to option title (capitalize first letter)
-          const optionTitle = part.charAt(0) + part.slice(1).toLowerCase()
-            .replace(/_/g, ' ') // Replace underscores with spaces
-            .replace(/\b\w/g, l => l.toUpperCase()) // Capitalize words
-          
-          // Special handling for common cases
-          if (part.includes('COLOR') || part.includes('COLOUR')) {
-            options['Color'] = value
-          } else if (part.includes('SIZE') && !part.includes('STYLE')) {
-            options['Size'] = value
-          } else if (part.includes('STYLE')) {
-            options['Style'] = value
-          } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
-            options['Quantity'] = value
-          } else {
-            // Use the mapped option title for other variation parts
-            options[optionTitle] = value
-          }
+          options[column] = value
         }
-      })
-      
-      // Fallback: if no options based on theme, use SKU as option
+      }
+
+      // Fallback: if no options detected, use SKU as option
       if (Object.keys(options).length === 0) {
         options['Variant'] = sku
       }
-      
+
       // Debug: Log options to help diagnose issues
-      console.log(`   [DEBUG ${parentSKU}] Variant ${sku} options: ${JSON.stringify(options)}`)
+      logger.debug(
+        `[${parentSKU}] Variant ${sku} options: ${JSON.stringify(options)}`
+      )
 
       // Extract all variant metadata using helper function
       const metadata = extractVariantMetadata(childRow)
-      
+
       // Only save variant description to metadata if it exists AND differs from parent description
       const variantDescription = childRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
       const parentDescription = productDescription || ''
-      
+
       if (variantDescription && variantDescription.trim().length > 0) {
         const variantDescTrimmed = variantDescription.trim()
         const parentDescTrimmed = parentDescription.trim()
-        
+
         // Only save if variant description is different from parent description
         if (variantDescTrimmed !== parentDescTrimmed) {
           metadata.product_description = variantDescTrimmed
         }
         // If they're the same, don't set metadata.product_description (keep it empty)
       }
-      
+
       // Extract variant-specific images and save to metadata
       const variantImages = extractImages(childRow)
       if (variantImages.length > 0) {
@@ -454,7 +421,7 @@ export async function importParentGroup(
             currency_code: 'gbp',
             rules_count: 0, // Required for Algolia validation
             min_quantity: null,
-            max_quantity: null,
+            max_quantity: null
           }
         ],
         options,
@@ -463,15 +430,19 @@ export async function importParentGroup(
     })
 
     if (variants.length === 0) {
-      console.error(`   [DEBUG ${parentSKU}] ❌ No variants created from ${childRows.length} child rows`)
+      logger.error(
+        `[${parentSKU}] ❌ No variants created from ${childRows.length} child rows`
+      )
       return {
         success: false,
         error: 'No variants to create'
       }
     }
-    
-    console.log(`   [DEBUG ${parentSKU}] ✓ Created ${variants.length} variants`)
-    console.log(`   [DEBUG ${parentSKU}] Sample variant: SKU=${variants[0].sku}, Price=${variants[0].prices[0]?.amount}, Options=${JSON.stringify(variants[0].options)}`)
+
+    logger.debug(`[${parentSKU}] ✓ Created ${variants.length} variants`)
+    logger.debug(
+      `[${parentSKU}] Sample variant: SKU=${variants[0].sku}, Price=${variants[0].prices[0]?.amount}, Options=${JSON.stringify(variants[0].options)}`
+    )
 
     // 7. Generate readable handle from product title
     const generateHandle = (title: string, sku: string): string => {
@@ -484,82 +455,51 @@ export async function importParentGroup(
         .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
         .substring(0, 200) // Limit length
         .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens AFTER substring
-      
+
       // Ensure we don't have an empty handle
       if (!handle || handle === '') {
         handle = `product-${sku.toLowerCase()}`
       }
-      
+
       return handle
     }
-    
+
     const handle = generateHandle(productTitle, parentSKU)
 
-    // 9. Build product options based on variation theme
+    // 9. Build product options based on detected active attributes
     const productOptions: Array<{ title: string; values: string[] }> = []
-    
-    // Build options dynamically from variation parts
-    variationParts.forEach(part => {
-      let values: Set<string> | null = null
-      
-      // Map to the correct value set
-      if (part.includes('COLOR') || part.includes('COLOUR')) {
-        values = colors
-      } else if (part.includes('SIZE') && !part.includes('STYLE')) {
-        values = sizes
-      } else if (part.includes('STYLE')) {
-        values = styles
-      } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
-        values = quantities
-      } else {
-        // For other variation parts, collect values from the mapped column
-        const column = variationColumnMap[part]
-        if (column) {
-          values = new Set<string>()
-          childRows.forEach(row => {
-            const value = (row[column] || '').trim()
-            if (value) values!.add(value)
-          })
-        }
-      }
-      
-      if (values && values.size > 0) {
-        // Use standard option titles for common cases
-        let finalTitle = part.charAt(0) + part.slice(1).toLowerCase()
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, l => l.toUpperCase())
-        
-        if (part.includes('COLOR') || part.includes('COLOUR')) {
-          finalTitle = 'Color'
-        } else if (part.includes('SIZE') && !part.includes('STYLE')) {
-          finalTitle = 'Size'
-        } else if (part.includes('STYLE')) {
-          finalTitle = 'Style'
-        } else if (part.includes('QUANTITY') || part.includes('ITEM_PACKAGE')) {
-          finalTitle = 'Quantity'
-        }
-        
-        productOptions.push({
-          title: finalTitle,
-          values: Array.from(values)
-        })
-      }
-    })
-    
-    // Fallback: if no options based on variation theme, use SKU as option
-    if (productOptions.length === 0) {
+
+    // Create product options for each active attribute
+    for (const column of activeAttributes) {
+      const values = attributeValues.get(column)!
+
       productOptions.push({
-        title: 'Variant',
-        values: childRows.map(row => row['SKU'])
+        title: column,
+        values: Array.from(values)
       })
     }
 
+    // Fallback: if no attributes detected, use SKU as option
+    if (productOptions.length === 0) {
+      productOptions.push({
+        title: 'Variant',
+        values: validChildRows.map((row) => row[CSVColumn.SKU])
+      })
+    }
+
+    logger.debug(
+      `[${parentSKU}] Product options created: ${productOptions.map((o) => `${o.title} (${o.values.length} values)`).join(', ')}`
+    )
+
     // 9. Check if product already exists by handle or variants by SKU
-    console.log(`   [DEBUG ${parentSKU}] Checking if product with handle "${handle}" already exists...`)
-    
-    const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+    logger.debug(
+      `[${parentSKU}] Checking if product with handle "${handle}" already exists...`
+    )
+
+    const { ContainerRegistrationKeys } =
+      await import('@medusajs/framework/utils')
     const query = scope.resolve(ContainerRegistrationKeys.QUERY)
-    
+
     // Check for existing product by handle
     let existingProduct: any = null
     try {
@@ -571,14 +511,16 @@ export async function importParentGroup(
       if (data && data.length > 0) {
         existingProduct = data[0]
       }
-    } catch (err) {
-      // Product doesn't exist, continue
+    } catch (error: any) {
+      logger.warn(
+        `[${parentSKU}] ⚠️  Could not find existing product: ${error.message}`
+      )
     }
-    
+
     // Check for existing variants by SKU
-    const variantSkus = variants.map(v => v.sku)
+    const variantSkus = variants.map((v) => v.sku)
     const existingSkus = new Set<string>()
-    
+
     if (variantSkus.length > 0) {
       try {
         const { data: variantData } = await query.graph({
@@ -593,8 +535,10 @@ export async function importParentGroup(
             }
           })
         }
-      } catch (err) {
-        // No existing variants found
+      } catch (error: any) {
+        logger.warn(
+          `[${parentSKU}] ⚠️  Could not find existing variants: ${error.message}`
+        )
       }
     }
 
@@ -605,27 +549,34 @@ export async function importParentGroup(
       // Product already exists, use it
       product = existingProduct
       productId = product.id
-      console.log(`   [DEBUG ${parentSKU}] ⚠️  Product with handle "${handle}" already exists (ID: ${productId}), skipping creation`)
-      
+      logger.debug(
+        `[${parentSKU}] ⚠️  Product with handle "${handle}" already exists (ID: ${productId}), skipping creation`
+      )
+
       // Update description for existing product if we have a new description
       if (productDescription && productDescription.trim().length > 0) {
         try {
-          const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+          const { updateProductsWorkflow } =
+            await import('@medusajs/medusa/core-flows')
           await updateProductsWorkflow(scope).run({
             input: {
               selector: { id: productId },
               update: {
-                description: productDescription,
+                description: productDescription
               }
             }
           })
-          console.log(`   [DEBUG ${parentSKU}] ✓ Updated product description (length: ${productDescription.length})`)
+          logger.debug(
+            `[${parentSKU}] ✓ Updated product description (length: ${productDescription.length})`
+          )
         } catch (descUpdateError: any) {
-          console.log(`   [DEBUG ${parentSKU}] ⚠️  Failed to update description: ${descUpdateError.message}`)
+          logger.debug(
+            `[${parentSKU}] ⚠️  Failed to update description: ${descUpdateError.message}`
+          )
           // Non-fatal error, continue
         }
       }
-      
+
       // Update images for existing product if we have new images
       if (images.length > 0) {
         try {
@@ -635,47 +586,66 @@ export async function importParentGroup(
             fields: ['id', 'images.url', 'images.id'],
             filters: { id: productId }
           })
-          
+
           const existingImages = existingProductData?.[0]?.images || []
-          const existingImageUrls = new Set(existingImages.map((img: any) => img.url))
-          
+          const existingImageUrls = new Set(
+            existingImages.map((img: any) => img.url)
+          )
+
           // Merge: add new images that don't already exist
-          const imagesToAdd = images.filter(img => !existingImageUrls.has(img.url))
-          const mergedImages = [...existingImages.map((img: any) => ({ url: img.url })), ...imagesToAdd]
-          
-          
+          const imagesToAdd = images.filter(
+            (img) => !existingImageUrls.has(img.url)
+          )
+          const mergedImages = [
+            ...existingImages.map((img: any) => ({ url: img.url })),
+            ...imagesToAdd
+          ]
+
           if (mergedImages.length > 0) {
-            const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+            const { updateProductsWorkflow } =
+              await import('@medusajs/medusa/core-flows')
             await updateProductsWorkflow(scope).run({
               input: {
                 selector: { id: productId },
                 update: {
-                  images: mergedImages,
+                  images: mergedImages
                 }
               }
             })
-            console.log(`   [DEBUG ${parentSKU}] ✓ Updated product images (${mergedImages.length} total images)`)
+            logger.debug(
+              `[${parentSKU}] ✓ Updated product images (${mergedImages.length} total images)`
+            )
           }
         } catch (imageUpdateError: any) {
-          console.log(`   [DEBUG ${parentSKU}] ⚠️  Failed to update images: ${imageUpdateError.message}`)
+          logger.debug(
+            `[${parentSKU}] ⚠️  Failed to update images: ${imageUpdateError.message}`
+          )
           // Non-fatal error, continue
         }
       }
-      
+
       // Filter out existing variants
       if (existingSkus.size > 0) {
-        console.log(`   [DEBUG ${parentSKU}] ⚠️  Found ${existingSkus.size} existing variants with SKUs: ${Array.from(existingSkus).join(', ')}`)
-        variants = variants.filter(v => !existingSkus.has(v.sku))
-        
+        logger.debug(
+          `[${parentSKU}] ⚠️  Found ${existingSkus.size} existing variants with SKUs: ${Array.from(existingSkus).join(', ')}`
+        )
+        variants = variants.filter((v) => !existingSkus.has(v.sku))
+
         if (variants.length === 0) {
-          console.log(`   [DEBUG ${parentSKU}] ⚠️  All variants already exist, product is already complete`)
+          logger.debug(
+            `[${parentSKU}] ⚠️  All variants already exist, product is already complete`
+          )
           // Product and all variants exist, just link to seller if needed
           product = existingProduct
           productId = product.id
         } else {
-          console.log(`   [DEBUG ${parentSKU}] ℹ️  ${variants.length} new variants to add (${existingSkus.size} already exist)`)
+          logger.debug(
+            `[${parentSKU}] ℹ️  ${variants.length} new variants to add (${existingSkus.size} already exist)`
+          )
           // We can't add variants to existing product via this workflow, so skip
-          console.log(`   [DEBUG ${parentSKU}] ⚠️  Cannot add variants to existing product via import, skipping`)
+          logger.debug(
+            `[${parentSKU}] ⚠️  Cannot add variants to existing product via import, skipping`
+          )
           return {
             success: false,
             error: `Product already exists with handle "${handle}", cannot add new variants via import`
@@ -684,8 +654,10 @@ export async function importParentGroup(
       }
     } else if (existingSkus.size > 0) {
       // Product doesn't exist but some variants do
-      console.log(`   [DEBUG ${parentSKU}] ⚠️  Found ${existingSkus.size} existing variants with SKUs: ${Array.from(existingSkus).join(', ')}`)
-      
+      logger.debug(
+        `[${parentSKU}] ⚠️  Found ${existingSkus.size} existing variants with SKUs: ${Array.from(existingSkus).join(', ')}`
+      )
+
       // Try to find the product that owns these variants
       try {
         const { data: variantProducts } = await query.graph({
@@ -693,11 +665,13 @@ export async function importParentGroup(
           fields: ['product_id', 'sku'],
           filters: { sku: Array.from(existingSkus) }
         })
-        
+
         if (variantProducts && variantProducts.length > 0) {
           // Get unique product IDs from the variants
-          const productIds = [...new Set(variantProducts.map((v: any) => v.product_id))]
-          
+          const productIds = [
+            ...new Set(variantProducts.map((v: any) => v.product_id))
+          ]
+
           if (productIds.length === 1) {
             // All variants belong to the same product, use it
             const { data: foundProducts } = await query.graph({
@@ -705,12 +679,14 @@ export async function importParentGroup(
               fields: ['id', 'handle', 'title'],
               filters: { id: productIds[0] }
             })
-            
+
             if (foundProducts && foundProducts.length > 0) {
               product = foundProducts[0]
               productId = product.id
-              console.log(`   [DEBUG ${parentSKU}] ✓ Found product that owns existing variants: ${productId}`)
-              
+              logger.debug(
+                `[${parentSKU}] ✓ Found product that owns existing variants: ${productId}`
+              )
+
               // Update images for existing product if we have new images
               if (images.length > 0) {
                 try {
@@ -720,33 +696,44 @@ export async function importParentGroup(
                     fields: ['id', 'images.url', 'images.id'],
                     filters: { id: productId }
                   })
-                  
+
                   const existingImages = existingProductData?.[0]?.images || []
-                  const existingImageUrls = new Set(existingImages.map((img: any) => img.url))
-                  
+                  const existingImageUrls = new Set(
+                    existingImages.map((img: any) => img.url)
+                  )
+
                   // Merge: add new images that don't already exist
-                  const imagesToAdd = images.filter(img => !existingImageUrls.has(img.url))
-                  const mergedImages = [...existingImages.map((img: any) => ({ url: img.url })), ...imagesToAdd]
-                  
-                  
+                  const imagesToAdd = images.filter(
+                    (img) => !existingImageUrls.has(img.url)
+                  )
+                  const mergedImages = [
+                    ...existingImages.map((img: any) => ({ url: img.url })),
+                    ...imagesToAdd
+                  ]
+
                   if (mergedImages.length > 0) {
-                    const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+                    const { updateProductsWorkflow } =
+                      await import('@medusajs/medusa/core-flows')
                     await updateProductsWorkflow(scope).run({
                       input: {
                         selector: { id: productId },
                         update: {
-                          images: mergedImages,
+                          images: mergedImages
                         }
                       }
                     })
-                    console.log(`   [DEBUG ${parentSKU}] ✓ Updated product images (${mergedImages.length} total images)`)
+                    logger.debug(
+                      `[${parentSKU}] ✓ Updated product images (${mergedImages.length} total images)`
+                    )
                   }
                 } catch (imageUpdateError: any) {
-                  console.log(`   [DEBUG ${parentSKU}] ⚠️  Failed to update images: ${imageUpdateError.message}`)
+                  logger.debug(
+                    `[${parentSKU}] ⚠️  Failed to update images: ${imageUpdateError.message}`
+                  )
                   // Non-fatal error, continue
                 }
               }
-              
+
               // All variants exist, product is complete
               variants = []
               // Load product with variants for inventory processing
@@ -760,34 +747,70 @@ export async function importParentGroup(
               }
             }
           } else if (productIds.length > 1) {
-            console.log(`   [DEBUG ${parentSKU}] ⚠️  Variants belong to ${productIds.length} different products, this is inconsistent`)
+            logger.debug(
+              `[${parentSKU}] ⚠️  Variants belong to ${productIds.length} different products, this is inconsistent`
+            )
           }
         }
       } catch (err) {
-        console.log(`   [DEBUG ${parentSKU}] ⚠️  Could not find product for existing variants: ${err}`)
+        logger.debug(
+          `[${parentSKU}] ⚠️  Could not find product for existing variants: ${err}`
+        )
       }
-      
+
       // If we still don't have a product, filter out existing variants and try to create with remaining ones
       if (!product) {
-        variants = variants.filter(v => !existingSkus.has(v.sku))
-        
+        variants = variants.filter((v) => !existingSkus.has(v.sku))
+
         if (variants.length === 0) {
-          console.log(`   [DEBUG ${parentSKU}] ❌ All variants already exist but couldn't find the product`)
+          logger.debug(
+            `[${parentSKU}] ❌ All variants already exist but couldn't find the product`
+          )
           return {
             success: false,
             error: `All variants already exist for product ${parentSKU} but product couldn't be found`
           }
         }
-        console.log(`   [DEBUG ${parentSKU}] ℹ️  Will create product with ${variants.length} new variants (skipping ${existingSkus.size} existing ones)`)
+        logger.debug(
+          `[${parentSKU}] ℹ️  Will create product with ${variants.length} new variants (skipping ${existingSkus.size} existing ones)`
+        )
       }
     }
 
     // 10. Create product with variants using workflow (only if product doesn't exist)
     if (!product) {
-      console.log(`   [DEBUG ${parentSKU}] Creating product with ${variants.length} variants, ${productOptions.length} options`)
-      console.log(`   [DEBUG ${parentSKU}] Handle: "${handle}", Category ID: ${leafCategory.id}, Type ID: ${productTypeId || 'none'}`)
-      console.log(`   [DEBUG ${parentSKU}] Product description being sent to workflow: length=${productDescription.length}${productDescription.length > 0 ? `, value="${productDescription.substring(0, 150)}${productDescription.length > 150 ? '...' : ''}"` : ' (EMPTY - will be empty in DB!)'}`)
-      
+      logger.debug(
+        `[${parentSKU}] Would create product with ${variants.length} variants, ${productOptions.length} options`
+      )
+      logger.debug(
+        `[${parentSKU}] Handle: "${handle}", Category ID: ${leafCategory.id}, Type ID: ${productTypeId || 'none'}`
+      )
+      logger.debug(
+        `[${parentSKU}] Product description length: ${productDescription.length}${productDescription.length > 0 ? `, value="${productDescription.substring(0, 150)}${productDescription.length > 150 ? '...' : ''}"` : ' (EMPTY)'}`
+      )
+
+      console.log(
+        JSON.stringify(
+          {
+            title: productTitle,
+            description: productDescription,
+            status: 'published',
+            is_giftcard: false,
+            discountable: true,
+            handle,
+            images,
+            category_ids: [leafCategory.id],
+            type_id: productTypeId, // Add product type ID
+            options: productOptions,
+            variants,
+            metadata: extractProductMetadata(parentRow, parentSKU, sellerId),
+            sales_channels: [{ id: salesChannelId }]
+          },
+          null,
+          2
+        )
+      )
+
       try {
         const { result } = await createProductsWorkflow(scope).run({
           input: {
@@ -804,7 +827,11 @@ export async function importParentGroup(
                 type_id: productTypeId, // Add product type ID
                 options: productOptions,
                 variants,
-                metadata: extractProductMetadata(parentRow, parentSKU, sellerId),
+                metadata: extractProductMetadata(
+                  parentRow,
+                  parentSKU,
+                  sellerId
+                ),
                 sales_channels: [{ id: salesChannelId }]
               }
             ]
@@ -812,46 +839,63 @@ export async function importParentGroup(
         })
 
         if (!result || !result[0]) {
-          console.error(`   [DEBUG ${parentSKU}] ❌ Product creation returned empty result`)
+          logger.error(
+            `[${parentSKU}] ❌ Product creation returned empty result`
+          )
           throw new Error('Product creation returned empty result')
         }
 
         product = result[0]
         productId = product.id
-        console.log(`   [DEBUG ${parentSKU}] ✓ Product created successfully: ${productId}`)
-        
+        logger.debug(
+          `[${parentSKU}] ✓ Product created successfully: ${productId}`
+        )
+
         // Verify description was saved
         if (productDescription && productDescription.trim().length > 0) {
           const savedDescription = product.description || ''
-          console.log(`   [DEBUG ${parentSKU}] Description verification: input length=${productDescription.length}, saved length=${savedDescription.length}`)
+          logger.debug(
+            `[${parentSKU}] Description verification: input length=${productDescription.length}, saved length=${savedDescription.length}`
+          )
           if (savedDescription.length === 0) {
-            console.error(`   [DEBUG ${parentSKU}] ❌ WARNING: Description was NOT saved! Input had ${productDescription.length} characters but saved description is empty.`)
+            logger.error(
+              `[${parentSKU}] ❌ WARNING: Description was NOT saved! Input had ${productDescription.length} characters but saved description is empty.`
+            )
             // Try to update it manually
             try {
-              const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+              const { updateProductsWorkflow } =
+                await import('@medusajs/medusa/core-flows')
               await updateProductsWorkflow(scope).run({
                 input: {
                   selector: { id: productId },
                   update: {
-                    description: productDescription,
+                    description: productDescription
                   }
                 }
               })
-              console.log(`   [DEBUG ${parentSKU}] ✓ Manually updated product description after creation`)
+              logger.debug(
+                `[${parentSKU}] ✓ Manually updated product description after creation`
+              )
             } catch (updateError: any) {
-              console.error(`   [DEBUG ${parentSKU}] ❌ Failed to manually update description: ${updateError.message}`)
+              logger.error(
+                `[${parentSKU}] ❌ Failed to manually update description: ${updateError.message}`
+              )
             }
           } else {
-            console.log(`   [DEBUG ${parentSKU}] ✓ Description saved successfully`)
+            logger.debug(`[${parentSKU}] ✓ Description saved successfully`)
           }
         }
       } catch (workflowError: any) {
         // Check if error is due to existing product/variant
-        if (workflowError.message?.includes('already exists') || 
-            workflowError.message?.includes('duplicate') ||
-            workflowError.message?.includes('unique constraint')) {
-          console.log(`   [DEBUG ${parentSKU}] ⚠️  Product/variant already exists, attempting to find existing product...`)
-          
+        if (
+          workflowError.message?.includes('already exists') ||
+          workflowError.message?.includes('duplicate') ||
+          workflowError.message?.includes('unique constraint')
+        ) {
+          logger.debug(
+            `[${parentSKU}] ⚠️  Product/variant already exists, attempting to find existing product...`
+          )
+
           // Try to find the existing product using query API
           try {
             const { data: foundProducts } = await query.graph({
@@ -859,31 +903,37 @@ export async function importParentGroup(
               fields: ['id', 'handle', 'title'],
               filters: { handle }
             })
-            
+
             if (foundProducts && foundProducts.length > 0) {
               product = foundProducts[0]
               productId = product.id
-              console.log(`   [DEBUG ${parentSKU}] ✓ Found existing product: ${productId}`)
+              logger.debug(
+                `[${parentSKU}] ✓ Found existing product: ${productId}`
+              )
             } else {
               // Product handle doesn't exist, might be a variant SKU conflict
-              console.log(`   [DEBUG ${parentSKU}] ⚠️  Product handle not found, error likely due to existing variant SKU`)
+              logger.debug(
+                `[${parentSKU}] ⚠️  Product handle not found, error likely due to existing variant SKU`
+              )
               return {
                 success: false,
                 error: `Product or variant already exists: ${workflowError.message}`
               }
             }
           } catch (queryError: any) {
-            console.error(`   [DEBUG ${parentSKU}] ❌ Failed to query for existing product:`)
-            console.error(`   [DEBUG ${parentSKU}]    Query Error: ${queryError.message}`)
+            logger.error(
+              `[${parentSKU}] ❌ Failed to query for existing product:`
+            )
+            logger.error(`[${parentSKU}]    Query Error: ${queryError.message}`)
             return {
               success: false,
               error: `Product or variant already exists: ${workflowError.message}`
             }
           }
         } else {
-          console.error(`   [DEBUG ${parentSKU}] ❌ Product creation workflow failed:`)
-          console.error(`   [DEBUG ${parentSKU}]    Error: ${workflowError.message}`)
-          console.error(`   [DEBUG ${parentSKU}]    Stack: ${workflowError.stack}`)
+          logger.error(`[${parentSKU}] ❌ Product creation workflow failed:`)
+          logger.error(`[${parentSKU}]    Error: ${workflowError.message}`)
+          logger.error(`[${parentSKU}]    Stack: ${workflowError.stack}`)
           throw workflowError
         }
       }
@@ -891,7 +941,8 @@ export async function importParentGroup(
 
     // 8. Link product to seller (using direct DB insert into join table)
     try {
-      const { ContainerRegistrationKeys, generateEntityId } = await import('@medusajs/framework/utils')
+      const { ContainerRegistrationKeys, generateEntityId } =
+        await import('@medusajs/framework/utils')
       const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
 
       // Check if link already exists
@@ -911,22 +962,27 @@ export async function importParentGroup(
           created_at: new Date(),
           updated_at: new Date()
         })
-        console.log(`   [DEBUG ${parentSKU}] ✓ Linked product to seller`)
+        logger.debug(`[${parentSKU}] ✓ Linked product to seller`)
       } else {
-        console.log(`   [DEBUG ${parentSKU}] ℹ️  Product already linked to seller`)
+        logger.debug(`[${parentSKU}] ℹ️  Product already linked to seller`)
       }
     } catch (linkError: any) {
       // Link error - non-fatal, but log it
-      console.log(`   [DEBUG ${parentSKU}] ⚠️  Could not link product to seller: ${linkError.message}`)
+      logger.debug(
+        `[${parentSKU}] ⚠️  Could not link product to seller: ${linkError.message}`
+      )
     }
+    logger.info(
+      `[${parentSKU}] ✓ [DEBUG MODE] Would have linked product to seller`
+    )
 
     // 9. Create inventory items for each variant
     const inventoryModule = scope.resolve(Modules.INVENTORY)
 
     // Create a map of SKU to childRow for efficient lookup
     const childRowMap = new Map<string, CSVRow>()
-    childRows.forEach(row => {
-      const sku = row['SKU']
+    childRows.forEach((row) => {
+      const sku = row[CSVColumn.SKU]
       if (sku) {
         childRowMap.set(sku, row)
       }
@@ -934,7 +990,7 @@ export async function importParentGroup(
 
     // Process all variants of the product (whether newly created or existing)
     const variantsToProcess = product.variants || []
-    
+
     for (const variant of variantsToProcess) {
       // Find matching child row by SKU, or use empty row if not found (for existing variants)
       const childRow = childRowMap.get(variant.sku) || ({} as CSVRow)
@@ -963,9 +1019,10 @@ export async function importParentGroup(
 
         // Link inventory item to seller
         try {
-          const { ContainerRegistrationKeys, generateEntityId } = await import('@medusajs/framework/utils')
+          const { ContainerRegistrationKeys, generateEntityId } =
+            await import('@medusajs/framework/utils')
           const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
-          
+
           // Check if link already exists
           const existing = await knex('seller_seller_inventory_inventory_item')
             .where({
@@ -985,8 +1042,10 @@ export async function importParentGroup(
               updated_at: new Date()
             })
           }
-        } catch (linkError: any) {
-          // Link error - non-fatal
+        } catch (err: any) {
+          logger.warn(
+            `[${parentSKU}] ⚠️  Could not link inventory item to seller: ${err.message}`
+          )
         }
 
         // Link inventory item to variant
@@ -1017,20 +1076,30 @@ export async function importParentGroup(
         }
       } catch (invError: any) {
         // Inventory error - non-fatal
+        logger.warn(
+          `[${parentSKU}] ⚠️  Could not create inventory level: ${invError.message}`
+        )
       }
     }
+    logger.info(
+      `[${parentSKU}] ✓ [DEBUG MODE] Would have created inventory for ${variants.length} variants`
+    )
 
-    console.log(`   [DEBUG ${parentSKU}] ✓ Product import completed successfully`)
+    logger.info(
+      `[${parentSKU}] ✓ [DEBUG MODE] Product import validation completed successfully (not saved to database)`
+    )
     return {
       success: true,
       productId
     }
   } catch (error: any) {
-    console.error(`   [DEBUG ${parentSKU}] ❌ Import failed with error:`)
-    console.error(`   [DEBUG ${parentSKU}]    Message: ${error.message || 'Unknown error'}`)
-    console.error(`   [DEBUG ${parentSKU}]    Stack: ${error.stack || 'No stack trace'}`)
+    logger.error(`[${parentSKU}] ❌ Import failed with error:`)
+    logger.error(
+      `[${parentSKU}]    Message: ${error.message || 'Unknown error'}`
+    )
+    logger.error(`[${parentSKU}]    Stack: ${error.stack || 'No stack trace'}`)
     if (error.cause) {
-      console.error(`   [DEBUG ${parentSKU}]    Cause: ${error.cause}`)
+      logger.error(`[${parentSKU}]    Cause: ${error.cause}`)
     }
     return {
       success: false,
@@ -1045,6 +1114,7 @@ export async function importParentGroup(
 export async function importParentGroups(
   groups: ParentGroup[],
   context: ImportContext,
+  logger: Logger,
   scope: any
 ): Promise<{
   total: number
@@ -1061,13 +1131,17 @@ export async function importParentGroups(
 
   for (let i = 0; i < groups.length; i++) {
     const group = groups[i]
-    console.log(`\n📦 [Import Progress] Processing product ${i + 1}/${groups.length}: ${group.parentSKU}`)
-    
-    const result = await importParentGroup(group, context, scope)
+    logger.debug(
+      `\n📦 [Import Progress] Processing product ${i + 1}/${groups.length}: ${group.parentSKU}`
+    )
+
+    const result = await importParentGroup(group, context, logger, scope)
 
     if (result.success) {
       results.success++
-      console.log(`   ✅ [Import Progress] Successfully imported ${group.parentSKU} → ${result.productId}`)
+      logger.debug(
+        `   ✅ [Import Progress] Successfully imported ${group.parentSKU} → ${result.productId}`
+      )
     } else {
       results.failed++
       const errorMsg = result.error || 'Unknown error'
@@ -1075,10 +1149,11 @@ export async function importParentGroups(
         parentSKU: group.parentSKU,
         error: errorMsg
       })
-      console.error(`   ❌ [Import Progress] Failed to import ${group.parentSKU}: ${errorMsg}`)
+      logger.error(
+        `   ❌ [Import Progress] Failed to import ${group.parentSKU}: ${errorMsg}`
+      )
     }
   }
 
   return results
 }
-
