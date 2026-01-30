@@ -28,8 +28,9 @@ import {
  * Only includes single attributes (not combinations like 'Colour/Size')
  */
 function getVariantColumns(): string[] {
-  return Object.values(ProductVariationTheme)
-    .filter(value => !value.includes('/')) // Only single attributes
+  return Object.values(ProductVariationTheme).filter(
+    (value) => !value.includes('/')
+  ) // Only single attributes
 }
 
 interface ImportContext {
@@ -286,9 +287,7 @@ export async function importParentGroup(
     logger.debug(`[${parentSKU}] Active variant attributes detected:`)
     for (const column of activeAttributes) {
       const values = attributeValues.get(column)!
-      logger.debug(
-        `[${parentSKU}]   - ${column}: ${values.size} unique values`
-      )
+      logger.debug(`[${parentSKU}]   - ${column}: ${values.size} unique values`)
     }
 
     // 8. Create variants from child rows
@@ -812,13 +811,6 @@ export async function importParentGroup(
         )
       )
 
-      return {
-        success: true,
-        productId: `DEBUG_${parentSKU}`
-      }
-
-      // COMMENTED OUT FOR DEBUGGING - NOT CREATING PRODUCTS IN DATABASE
-      /*
       try {
         const { result } = await createProductsWorkflow(scope).run({
           input: {
@@ -835,7 +827,11 @@ export async function importParentGroup(
                 type_id: productTypeId, // Add product type ID
                 options: productOptions,
                 variants,
-                metadata: extractProductMetadata(parentRow, parentSKU, sellerId),
+                metadata: extractProductMetadata(
+                  parentRow,
+                  parentSKU,
+                  sellerId
+                ),
                 sales_channels: [{ id: salesChannelId }]
               }
             ]
@@ -843,34 +839,47 @@ export async function importParentGroup(
         })
 
         if (!result || !result[0]) {
-          logger.error(`[${parentSKU}] ❌ Product creation returned empty result`)
+          logger.error(
+            `[${parentSKU}] ❌ Product creation returned empty result`
+          )
           throw new Error('Product creation returned empty result')
         }
 
         product = result[0]
         productId = product.id
-        logger.debug(`[${parentSKU}] ✓ Product created successfully: ${productId}`)
-        
+        logger.debug(
+          `[${parentSKU}] ✓ Product created successfully: ${productId}`
+        )
+
         // Verify description was saved
         if (productDescription && productDescription.trim().length > 0) {
           const savedDescription = product.description || ''
-          logger.debug(`[${parentSKU}] Description verification: input length=${productDescription.length}, saved length=${savedDescription.length}`)
+          logger.debug(
+            `[${parentSKU}] Description verification: input length=${productDescription.length}, saved length=${savedDescription.length}`
+          )
           if (savedDescription.length === 0) {
-            logger.error(`[${parentSKU}] ❌ WARNING: Description was NOT saved! Input had ${productDescription.length} characters but saved description is empty.`)
+            logger.error(
+              `[${parentSKU}] ❌ WARNING: Description was NOT saved! Input had ${productDescription.length} characters but saved description is empty.`
+            )
             // Try to update it manually
             try {
-              const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+              const { updateProductsWorkflow } =
+                await import('@medusajs/medusa/core-flows')
               await updateProductsWorkflow(scope).run({
                 input: {
                   selector: { id: productId },
                   update: {
-                    description: productDescription,
+                    description: productDescription
                   }
                 }
               })
-              logger.debug(`[${parentSKU}] ✓ Manually updated product description after creation`)
+              logger.debug(
+                `[${parentSKU}] ✓ Manually updated product description after creation`
+              )
             } catch (updateError: any) {
-              logger.error(`[${parentSKU}] ❌ Failed to manually update description: ${updateError.message}`)
+              logger.error(
+                `[${parentSKU}] ❌ Failed to manually update description: ${updateError.message}`
+              )
             }
           } else {
             logger.debug(`[${parentSKU}] ✓ Description saved successfully`)
@@ -878,11 +887,15 @@ export async function importParentGroup(
         }
       } catch (workflowError: any) {
         // Check if error is due to existing product/variant
-        if (workflowError.message?.includes('already exists') || 
-            workflowError.message?.includes('duplicate') ||
-            workflowError.message?.includes('unique constraint')) {
-          logger.debug(`[${parentSKU}] ⚠️  Product/variant already exists, attempting to find existing product...`)
-          
+        if (
+          workflowError.message?.includes('already exists') ||
+          workflowError.message?.includes('duplicate') ||
+          workflowError.message?.includes('unique constraint')
+        ) {
+          logger.debug(
+            `[${parentSKU}] ⚠️  Product/variant already exists, attempting to find existing product...`
+          )
+
           // Try to find the existing product using query API
           try {
             const { data: foundProducts } = await query.graph({
@@ -890,21 +903,27 @@ export async function importParentGroup(
               fields: ['id', 'handle', 'title'],
               filters: { handle }
             })
-            
+
             if (foundProducts && foundProducts.length > 0) {
               product = foundProducts[0]
               productId = product.id
-              logger.debug(`[${parentSKU}] ✓ Found existing product: ${productId}`)
+              logger.debug(
+                `[${parentSKU}] ✓ Found existing product: ${productId}`
+              )
             } else {
               // Product handle doesn't exist, might be a variant SKU conflict
-              logger.debug(`[${parentSKU}] ⚠️  Product handle not found, error likely due to existing variant SKU`)
+              logger.debug(
+                `[${parentSKU}] ⚠️  Product handle not found, error likely due to existing variant SKU`
+              )
               return {
                 success: false,
                 error: `Product or variant already exists: ${workflowError.message}`
               }
             }
           } catch (queryError: any) {
-            logger.error(`[${parentSKU}] ❌ Failed to query for existing product:`)
+            logger.error(
+              `[${parentSKU}] ❌ Failed to query for existing product:`
+            )
             logger.error(`[${parentSKU}]    Query Error: ${queryError.message}`)
             return {
               success: false,
@@ -918,19 +937,12 @@ export async function importParentGroup(
           throw workflowError
         }
       }
-      */
-      // Simulate successful product creation for debugging
-      productId = `DEBUG_${parentSKU}`
-      logger.info(
-        `[${parentSKU}] ✓ [DEBUG MODE] Would have created product with ID: ${productId}`
-      )
     }
 
     // 8. Link product to seller (using direct DB insert into join table)
-    // COMMENTED OUT FOR DEBUGGING - NOT LINKING TO SELLER
-    /*
     try {
-      const { ContainerRegistrationKeys, generateEntityId } = await import('@medusajs/framework/utils')
+      const { ContainerRegistrationKeys, generateEntityId } =
+        await import('@medusajs/framework/utils')
       const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
 
       // Check if link already exists
@@ -956,21 +968,20 @@ export async function importParentGroup(
       }
     } catch (linkError: any) {
       // Link error - non-fatal, but log it
-      logger.debug(`[${parentSKU}] ⚠️  Could not link product to seller: ${linkError.message}`)
+      logger.debug(
+        `[${parentSKU}] ⚠️  Could not link product to seller: ${linkError.message}`
+      )
     }
-    */
     logger.info(
       `[${parentSKU}] ✓ [DEBUG MODE] Would have linked product to seller`
     )
 
     // 9. Create inventory items for each variant
-    // COMMENTED OUT FOR DEBUGGING - NOT CREATING INVENTORY
-    /*
     const inventoryModule = scope.resolve(Modules.INVENTORY)
 
     // Create a map of SKU to childRow for efficient lookup
     const childRowMap = new Map<string, CSVRow>()
-    childRows.forEach(row => {
+    childRows.forEach((row) => {
       const sku = row[CSVColumn.SKU]
       if (sku) {
         childRowMap.set(sku, row)
@@ -979,7 +990,7 @@ export async function importParentGroup(
 
     // Process all variants of the product (whether newly created or existing)
     const variantsToProcess = product.variants || []
-    
+
     for (const variant of variantsToProcess) {
       // Find matching child row by SKU, or use empty row if not found (for existing variants)
       const childRow = childRowMap.get(variant.sku) || ({} as CSVRow)
@@ -1008,9 +1019,10 @@ export async function importParentGroup(
 
         // Link inventory item to seller
         try {
-          const { ContainerRegistrationKeys, generateEntityId } = await import('@medusajs/framework/utils')
+          const { ContainerRegistrationKeys, generateEntityId } =
+            await import('@medusajs/framework/utils')
           const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
-          
+
           // Check if link already exists
           const existing = await knex('seller_seller_inventory_inventory_item')
             .where({
@@ -1031,16 +1043,18 @@ export async function importParentGroup(
             })
           }
         } catch (err: any) {
-          logger.warn(`[${parentSKU}] ⚠️  Could not link inventory item to seller: ${err.message}`)
+          logger.warn(
+            `[${parentSKU}] ⚠️  Could not link inventory item to seller: ${err.message}`
+          )
         }
 
         // Link inventory item to variant
         const remoteLink = scope.resolve('remoteLink')
         await remoteLink.create({
-       [Modules.PRODUCT]: {
+          [Modules.PRODUCT]: {
             variant_id: variant.id
           },
-       [Modules.INVENTORY]: {
+          [Modules.INVENTORY]: {
             inventory_item_id: inventoryItemId
           }
         })
@@ -1062,10 +1076,11 @@ export async function importParentGroup(
         }
       } catch (invError: any) {
         // Inventory error - non-fatal
-        logger.warn(`[${parentSKU}] ⚠️  Could not create inventory level: ${invError.message}`)
+        logger.warn(
+          `[${parentSKU}] ⚠️  Could not create inventory level: ${invError.message}`
+        )
       }
     }
-    */
     logger.info(
       `[${parentSKU}] ✓ [DEBUG MODE] Would have created inventory for ${variants.length} variants`
     )
