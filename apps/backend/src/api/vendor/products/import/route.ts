@@ -277,6 +277,7 @@ export async function POST(
     logger.info(`\n✅ [Product Import] ${validGroups.length} products passed validation, starting import...`)
 
     // 8. Import products
+    // COMMENTED OUT FOR DEBUGGING - NOT STORING TO DATABASE YET
     const importResults = await importParentGroups(
       validGroups,
       {
@@ -318,16 +319,17 @@ export async function POST(
     logger.info(`${'='.repeat(60)}\n`)
 
     // 9. Trigger Algolia reindex for imported products
-    try {
-      const { syncAlgoliaWorkflow } = await import('@mercurjs/algolia/workflows')
-      await syncAlgoliaWorkflow.run({ container: req.scope })
-    } catch (algoliaError: any) {
-      logger.warn(`Algolia reindex failed (non-critical): ${algoliaError.message}`)
-    }
+    // COMMENTED OUT FOR DEBUGGING - NOT SYNCING TO ALGOLIA YET
+    // try {
+    //   const { syncAlgoliaWorkflow } = await import('@mercurjs/algolia/workflows')
+    //   await syncAlgoliaWorkflow.run({ container: req.scope })
+    // } catch (algoliaError: any) {
+    //   logger.warn(`Algolia reindex failed (non-critical): ${algoliaError.message}`)
+    // }
 
     // 10. Return results
     res.status(200).json({
-      message: 'Import completed',
+      message: 'Import completed (DEBUG MODE - not saved to database)',
       summary: {
         total: groups.length,
         imported: importResults.success,
