@@ -135,9 +135,9 @@ export const ProductVariationTheme = {
 export type ProductVariationThemeType = typeof ProductVariationTheme[keyof typeof ProductVariationTheme]
 
 /**
- * CSV column name constants
+ * Core CSV columns - essential product/variant data
  */
-export const CSVColumn = {
+export const CSVCoreColumn = {
   // Core fields
   STATUS: 'Status',
   LISTING_ACTION: 'Listing Action',
@@ -160,15 +160,6 @@ export const CSVColumn = {
   PARENT_SKU: 'Parent SKU',
   VARIATION_THEME_NAME: 'Variation Theme Name',
 
-  // Variants
-  COLOUR: 'Colour',
-  SIZE: 'Size',
-  STYLE: 'Style',
-  MATERIAL: 'Material',
-  EDGE: 'Edge',
-  SHAPE: 'Shape',
-  FINISH: 'Finish',
-
   // Images
   MAIN_IMAGE_URL: 'Main Image URL',
   IMAGE_2: 'Image 2',
@@ -179,6 +170,34 @@ export const CSVColumn = {
   IMAGE_7: 'Image 7',
   IMAGE_8: 'Image 8',
   IMAGE_9: 'Image 9',
+} as const
+
+/**
+ * Extended attribute columns - can be either OPTIONS or ATTRIBUTES depending on context
+ *
+ * DYNAMIC BEHAVIOR:
+ * - If a column is listed in the "Variation Theme Name" field (parsed by parseVariationTheme),
+ *   it becomes an OPTION (variant differentiator, e.g., Color: Red, Size: Large)
+ * - If a column is NOT in the variation theme, it becomes an ATTRIBUTE
+ *   (common product property shared across all variants)
+ *
+ * Example: If Variation Theme Name = "Size/Colour", then:
+ *   - Size and Colour become OPTIONS (each variant has different values)
+ *   - Material, Brand Name, etc. become ATTRIBUTES (same for all variants)
+ *
+ * This allows any attribute to become an option in the future without code changes -
+ * just update the Variation Theme Name in the CSV.
+ */
+export const CSVExtendedAttributeColumn = {
+  // Variant-capable attributes (commonly used as options via ProductVariationTheme)
+  COLOUR: 'Colour',
+  SIZE: 'Size',
+  STYLE: 'Style',
+  MATERIAL: 'Material',
+  EDGE: 'Edge',
+  SHAPE: 'Shape',
+  FINISH: 'Finish',
+  UNITS_PER_PRODUCT: 'Units per Product',
 
   // Brand
   BRAND_NAME: 'Brand Name',
@@ -198,7 +217,6 @@ export const CSVColumn = {
   SPECIAL_FEATURES_5: 'Special Features_5',
 
   // Units
-  UNITS_PER_PRODUCT: 'Units per Product',
   UNIT_MEASUREMENT: 'Unit Measurement',
 
   // Product Dimensions
@@ -237,6 +255,14 @@ export const CSVColumn = {
 
   // Restrictions
   AGE_RESTRICTED: 'Age Restricted'
+} as const
+
+/**
+ * Combined CSV column name constants (for backward compatibility)
+ */
+export const CSVColumn = {
+  ...CSVCoreColumn,
+  ...CSVExtendedAttributeColumn,
 } as const
 
 export interface CSVRow {
@@ -601,6 +627,24 @@ export function extractProductMetadata(row: CSVRow, parentSKU: string, sellerId:
   if (row[CSVColumn.AGE_RESTRICTED]) metadata.age_restricted = row[CSVColumn.AGE_RESTRICTED]
 
   return metadata
+}
+
+/**
+ * Extract all extended attribute columns from a row as key-value pairs
+ * Collects all values regardless of whether they're empty (filtering happens later during attribute creation)
+ *
+ * Note: This extracts ALL extended attributes. The caller should filter out
+ * columns that are being used as OPTIONS (via parseVariationTheme) if needed.
+ */
+export function extractAttributes(row: CSVRow): Record<string, string> {
+  const attributes: Record<string, string> = {}
+
+  // Iterate over all extended attribute columns and collect their values
+  for (const columnName of Object.values(CSVExtendedAttributeColumn)) {
+    attributes[columnName] = row[columnName] ?? ''
+  }
+
+  return attributes
 }
 
 /**

@@ -15,7 +15,9 @@ import { getCategoryForProductType } from './category-mapping'
 import type { CSVRow, ParentGroup } from './csv-parser'
 import {
   CSVColumn,
+  CSVExtendedAttributeColumn,
   ProductVariationTheme,
+  extractAttributes,
   extractImages,
   extractPrice,
   extractProductMetadata,
@@ -280,7 +282,11 @@ export async function importParentGroup(
 
     // 6. Read and parse Variation Theme Name
     const variationThemeRaw = parentRow[CSVColumn.VARIATION_THEME_NAME] || ''
-    let variantColumns = parseVariationTheme(variationThemeRaw, logger, parentSKU)
+    let variantColumns = parseVariationTheme(
+      variationThemeRaw,
+      logger,
+      parentSKU
+    )
 
     // If no variation theme or couldn't parse, check all ProductVariationTheme columns
     if (variantColumns.length === 0) {
@@ -290,9 +296,7 @@ export async function importParentGroup(
       variantColumns = Object.values(ProductVariationTheme)
     }
 
-    logger.debug(
-      `[${parentSKU}] Variation theme: "${variationThemeRaw}"`
-    )
+    logger.debug(`[${parentSKU}] Variation theme: "${variationThemeRaw}"`)
     logger.debug(
       `[${parentSKU}] Variant columns to check: ${variantColumns.join(', ')}`
     )
@@ -328,6 +332,51 @@ export async function importParentGroup(
     for (const column of activeAttributes) {
       const values = attributeValues.get(column)!
       logger.debug(`[${parentSKU}]   - ${column}: ${values.size} unique values`)
+    }
+
+    // 7b. Collect product attributes from parent row
+    // These are extended attributes that can be either:
+    // - OPTIONS: if listed in Variation Theme Name (variant-differentiating, e.g., Color: Red)
+    // - ATTRIBUTES: if NOT in variation theme (common properties shared across all variants)
+    // The activeAttributes array above contains the ones being used as OPTIONS for this product.
+    // We need to exclude those from the attributes.
+    const allExtendedAttributes = extractAttributes(parentRow)
+
+    // Filter out attributes that are being used as options for this product
+    const productAttributes: Record<string, string> = {}
+    for (const [columnName, value] of Object.entries(allExtendedAttributes)) {
+      // Skip if this column is being used as an option (variant differentiator)
+      if (!activeAttributes.includes(columnName)) {
+        productAttributes[columnName] = value
+      }
+    }
+
+    logger.debug(`[${parentSKU}] 📊 Attribute breakdown:`)
+    logger.debug(
+      `[${parentSKU}]   - Total extended attributes: ${Object.keys(allExtendedAttributes).length}`
+    )
+    logger.debug(
+      `[${parentSKU}]   - Active OPTIONS (excluded from attributes): ${activeAttributes.length} → [${activeAttributes.join(', ')}]`
+    )
+    logger.debug(
+      `[${parentSKU}]   - Pure ATTRIBUTES (not options): ${Object.keys(productAttributes).length}`
+    )
+
+    // Log attributes with values
+    const attributesWithValues = Object.entries(productAttributes).filter(
+      ([_, v]) => v && v.trim() !== ''
+    )
+    if (attributesWithValues.length > 0) {
+      logger.debug(
+        `[${parentSKU}]   - Attributes with values: ${attributesWithValues.length}`
+      )
+      attributesWithValues.forEach(([key, value]) => {
+        logger.debug(
+          `[${parentSKU}]     • ${key}: "${value.substring(0, 50)}${value.length > 50 ? '...' : ''}"`
+        )
+      })
+    } else {
+      logger.debug(`[${parentSKU}]   - No attributes have values`)
     }
 
     // 8. Create variants from child rows
@@ -845,11 +894,11 @@ export async function importParentGroup(
                 type_id: productTypeId, // Add product type ID
                 options: productOptions,
                 variants,
-                metadata: extractProductMetadata(
-                  parentRow,
-                  parentSKU,
-                  sellerId
-                ),
+                metadata: {
+                  ...extractProductMetadata(parentRow, parentSKU, sellerId),
+                  // Store collected attributes for later attribute creation
+                  attributes: productAttributes
+                },
                 sales_channels: [{ id: salesChannelId }]
               }
             ]
@@ -1102,6 +1151,115 @@ export async function importParentGroup(
     logger.info(
       `[${parentSKU}] ✓ [DEBUG MODE] Would have created inventory for ${variants.length} variants`
     )
+
+    // 10. Create attributes for the product
+    // TODO: Uncomment when ready to enable attribute creation
+    /*
+    try {
+      const attributeModule = scope.resolve('attributeModuleService')
+      const remoteLink = scope.resolve('remoteLink')
+
+      logger.debug(`[${parentSKU}] 🏷️  Starting attribute creation...`)
+
+      // Filter attributes that have values
+      const attributesToCreate = Object.entries(productAttributes).filter(
+        ([_, value]) => value && value.trim() !== ''
+      )
+
+      if (attributesToCreate.length === 0) {
+        logger.debug(`[${parentSKU}] No attributes with values to create`)
+      } else {
+        logger.debug(
+          `[${parentSKU}] Creating ${attributesToCreate.length} attributes for product`
+        )
+
+        for (const [attributeName, attributeValue] of attributesToCreate) {
+          try {
+            // Generate handle from attribute name
+            const handle = attributeName
+              .toLowerCase()
+              .replace(/[^a-z0-9\s-]/g, '')
+              .trim()
+              .replace(/\s+/g, '-')
+              .replace(/-+/g, '-')
+
+            logger.debug(
+              `[${parentSKU}]   Processing attribute: "${attributeName}" = "${attributeValue.substring(0, 50)}${attributeValue.length > 50 ? '...' : ''}"`
+            )
+
+            // Check if attribute already exists
+            let existingAttributes = await attributeModule.listAttributes({
+              handle
+            })
+
+            let attribute
+            if (existingAttributes && existingAttributes.length > 0) {
+              attribute = existingAttributes[0]
+              logger.debug(
+                `[${parentSKU}]     ✓ Found existing attribute: "${attributeName}" (ID: ${attribute.id})`
+              )
+            } else {
+              // Create new attribute
+              const newAttribute = await attributeModule.createAttributes({
+                name: attributeName,
+                handle,
+                ui_component: 'text_area', // Default to text_area for CSV imports
+                is_filterable: true,
+                is_required: false,
+                description: `Imported from CSV: ${attributeName}`
+              })
+              attribute = newAttribute
+              logger.debug(
+                `[${parentSKU}]     ✓ Created new attribute: "${attributeName}" (ID: ${attribute.id})`
+              )
+            }
+
+            // Create attribute value for this product
+            const attributeValues = await attributeModule.createAttributeValues([
+              {
+                attribute_id: attribute.id,
+                value: attributeValue,
+                rank: 0
+              }
+            ])
+
+            const attributeValueId = attributeValues[0].id
+            logger.debug(
+              `[${parentSKU}]     ✓ Created attribute value (ID: ${attributeValueId})`
+            )
+
+            // Link attribute value to product
+            await remoteLink.create({
+              [Modules.PRODUCT]: {
+                product_id: productId
+              },
+              attribute: {
+                attribute_value_id: attributeValueId
+              }
+            })
+
+            logger.debug(
+              `[${parentSKU}]     ✓ Linked attribute to product`
+            )
+          } catch (attrError: any) {
+            logger.warn(
+              `[${parentSKU}]   ⚠️  Failed to create attribute "${attributeName}": ${attrError.message}`
+            )
+            // Non-fatal, continue with other attributes
+          }
+        }
+
+        logger.debug(
+          `[${parentSKU}] ✓ Finished processing ${attributesToCreate.length} attributes`
+        )
+      }
+    } catch (error: any) {
+      logger.warn(
+        `[${parentSKU}] ⚠️  Attribute creation failed: ${error.message}`
+      )
+      // Non-fatal error, continue
+    }
+    */
 
     logger.info(
       `[${parentSKU}] ✓ [DEBUG MODE] Product import validation completed successfully (not saved to database)`
