@@ -10,6 +10,7 @@
 import { Modules } from '@medusajs/framework/utils'
 import { createProductsWorkflow, uploadFilesWorkflow } from '@medusajs/medusa/core-flows'
 import type { Logger } from '@medusajs/types'
+import sharp from 'sharp'
 
 import {
   createAttributeValueWorkflow,
@@ -31,8 +32,175 @@ import {
 } from './csv-parser'
 
 /**
+ * Maximum image dimensions (width or height)
+ */
+const MAX_IMAGE_DIMENSION = 1500
+
+/**
+ * Supported image MIME types
+ */
+const SUPPORTED_IMAGE_MIMES = {
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/svg+xml': '.svg',
+  'image/bmp': '.bmp',
+  'image/tiff': '.tiff',
+  'image/x-icon': '.ico'
+} as const
+
+/**
+ * Get file extension from MIME type
+ */
+function getExtensionFromMimeType(mimeType: string): string {
+  return SUPPORTED_IMAGE_MIMES[mimeType as keyof typeof SUPPORTED_IMAGE_MIMES] || '.jpg'
+}
+
+/**
+ * Detect image MIME type from buffer (magic numbers)
+ * Fallback for when Content-Type header is missing or incorrect
+ */
+function detectImageMimeType(buffer: Buffer): string | null {
+  // Check magic numbers (file signatures)
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'image/jpeg'
+  }
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+    return 'image/png'
+  }
+  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+    // RIFF format, check for WEBP
+    if (buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+      return 'image/webp'
+    }
+  }
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+    return 'image/gif'
+  }
+  if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
+    return 'image/bmp'
+  }
+  if ((buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2A && buffer[3] === 0x00) ||
+      (buffer[0] === 0x4D && buffer[1] === 0x4D && buffer[2] === 0x00 && buffer[3] === 0x2A)) {
+    return 'image/tiff'
+  }
+  if (buffer[0] === 0x3C && buffer[1] === 0x3F && buffer[2] === 0x78 && buffer[3] === 0x6D) {
+    // Check for SVG (starts with <?xml)
+    return 'image/svg+xml'
+  }
+  if (buffer[0] === 0x3C && buffer[1] === 0x73 && buffer[2] === 0x76 && buffer[3] === 0x67) {
+    // Check for SVG (starts with <svg)
+    return 'image/svg+xml'
+  }
+
+  return null
+}
+
+/**
+ * Resize image if it exceeds maximum dimensions while maintaining aspect ratio
+ * @param buffer - Image buffer
+ * @param mimeType - Image MIME type
+ * @param logger - Logger instance
+ * @returns Resized image buffer or original if no resize needed
+ */
+async function resizeImageIfNeeded(
+  buffer: Buffer,
+  mimeType: string,
+  logger: Logger
+): Promise<Buffer> {
+  try {
+    // Skip resizing for SVG (vector format, doesn't need resizing)
+    if (mimeType === 'image/svg+xml') {
+      logger.debug('Skipping resize for SVG (vector format)')
+      return buffer
+    }
+
+    // Get image metadata
+    const image = sharp(buffer)
+    const metadata = await image.metadata()
+
+    if (!metadata.width || !metadata.height) {
+      logger.warn('Could not read image dimensions, skipping resize')
+      return buffer
+    }
+
+    const { width, height } = metadata
+
+    // Check if resize is needed
+    if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
+      logger.debug(`Image dimensions ${width}x${height} are within limits, no resize needed`)
+      return buffer
+    }
+
+    // Calculate new dimensions maintaining aspect ratio
+    let newWidth: number
+    let newHeight: number
+
+    if (width > height) {
+      // Landscape or square - constrain by width
+      newWidth = MAX_IMAGE_DIMENSION
+      newHeight = Math.round((height / width) * MAX_IMAGE_DIMENSION)
+    } else {
+      // Portrait - constrain by height
+      newHeight = MAX_IMAGE_DIMENSION
+      newWidth = Math.round((width / height) * MAX_IMAGE_DIMENSION)
+    }
+
+    logger.debug(
+      `Resizing image from ${width}x${height} to ${newWidth}x${newHeight} (maintaining aspect ratio)`
+    )
+
+    // Resize image based on format
+    let resizedImage = image.resize(newWidth, newHeight, {
+      fit: 'inside', // Ensure image fits within dimensions
+      withoutEnlargement: true // Don't upscale small images
+    })
+
+    // Convert to appropriate format
+    switch (mimeType) {
+      case 'image/jpeg':
+      case 'image/jpg':
+        resizedImage = resizedImage.jpeg({ quality: 90 })
+        break
+      case 'image/png':
+        resizedImage = resizedImage.png({ quality: 90 })
+        break
+      case 'image/webp':
+        resizedImage = resizedImage.webp({ quality: 90 })
+        break
+      case 'image/gif':
+        // Sharp doesn't handle animated GIFs well, keep original
+        logger.debug('GIF detected, skipping resize to preserve animation')
+        return buffer
+      case 'image/tiff':
+        resizedImage = resizedImage.tiff({ quality: 90 })
+        break
+      default:
+        // For other formats, convert to JPEG
+        resizedImage = resizedImage.jpeg({ quality: 90 })
+    }
+
+    const resizedBuffer = await resizedImage.toBuffer()
+    const originalSizeKB = (buffer.length / 1024).toFixed(2)
+    const newSizeKB = (resizedBuffer.length / 1024).toFixed(2)
+
+    logger.debug(
+      `Image resized successfully: ${originalSizeKB} KB → ${newSizeKB} KB (${((1 - resizedBuffer.length / buffer.length) * 100).toFixed(1)}% reduction)`
+    )
+
+    return resizedBuffer
+  } catch (error: any) {
+    logger.warn(`Failed to resize image: ${error.message}, using original`)
+    return buffer
+  }
+}
+
+/**
  * Download a remote image and upload it to S3 using uploadFilesWorkflow
  * Uses a cache to avoid downloading the same image multiple times across different products
+ * Supports all major image formats: JPG, PNG, WEBP, GIF, SVG, BMP, TIFF, ICO
  * @param url - Remote image URL to download
  * @param scope - Medusa scope (container)
  * @param logger - Logger instance
@@ -74,15 +242,57 @@ async function downloadAndUploadImage(
     }
 
     const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    let buffer: Buffer = Buffer.from(arrayBuffer)
+
+    // Validate that we actually got image data
+    if (buffer.length === 0) {
+      logger.warn(`Downloaded empty file from ${trimmedUrl}`)
+      return null
+    }
+
+    // Detect MIME type from Content-Type header or buffer magic numbers
+    let mimeType = response.headers.get('content-type')?.split(';')[0].trim() || null
+
+    // Validate MIME type is a supported image format
+    if (!mimeType || !SUPPORTED_IMAGE_MIMES[mimeType as keyof typeof SUPPORTED_IMAGE_MIMES]) {
+      // Try to detect from buffer
+      const detectedMime = detectImageMimeType(buffer)
+      if (detectedMime) {
+        logger.debug(`Detected image format from file content: ${detectedMime}`)
+        mimeType = detectedMime
+      } else {
+        logger.warn(`Unsupported or undetected image format for ${trimmedUrl} (Content-Type: ${mimeType})`)
+        return null
+      }
+    }
+
+    // Resize image if it exceeds maximum dimensions (1500x1500)
+    buffer = await resizeImageIfNeeded(buffer, mimeType, logger)
 
     // Prepare base64 content for uploadFilesWorkflow
     const base64 = buffer.toString('base64')
-    const contentType = response.headers.get('content-type') || 'image/jpeg'
 
-    // Derive a filename from URL (fallback if none)
+    // Derive filename from URL
     const urlParts = trimmedUrl.split('/')
-    const filename = urlParts[urlParts.length - 1] || `image-${Date.now()}.jpg`
+    let filename = urlParts[urlParts.length - 1]?.split('?')[0] || '' // Remove query params
+
+    // Ensure filename has correct extension based on MIME type
+    const correctExtension = getExtensionFromMimeType(mimeType)
+    if (!filename || filename === '') {
+      // No filename in URL, generate one
+      filename = `image-${Date.now()}${correctExtension}`
+    } else if (!filename.toLowerCase().endsWith(correctExtension)) {
+      // Filename exists but wrong/missing extension, fix it
+      const filenameParts = filename.split('.')
+      if (filenameParts.length > 1) {
+        filenameParts[filenameParts.length - 1] = correctExtension.slice(1) // Remove leading dot
+        filename = filenameParts.join('.')
+      } else {
+        filename = `${filename}${correctExtension}`
+      }
+    }
+
+    logger.debug(`Uploading image: ${filename} (${mimeType}, ${(buffer.length / 1024).toFixed(2)} KB)`)
 
     // Upload to Medusa using uploadFilesWorkflow
     const { result: files } = await uploadFilesWorkflow(scope).run({
@@ -90,7 +300,7 @@ async function downloadAndUploadImage(
         files: [
           {
             filename,
-            mimeType: contentType,
+            mimeType,
             content: base64,
             access: 'public'
           }
