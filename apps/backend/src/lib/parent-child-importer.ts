@@ -8,7 +8,7 @@
  * @see Instructions in user documentation
  */
 import { Modules } from '@medusajs/framework/utils'
-import { createProductsWorkflow } from '@medusajs/medusa/core-flows'
+import { createProductsWorkflow, uploadFilesWorkflow } from '@medusajs/medusa/core-flows'
 import type { Logger } from '@medusajs/types'
 
 import {
@@ -29,6 +29,92 @@ import {
   extractQuantity,
   extractVariantMetadata
 } from './csv-parser'
+
+/**
+ * Download a remote image and upload it to S3 using uploadFilesWorkflow
+ * Uses a cache to avoid downloading the same image multiple times across different products
+ * @param url - Remote image URL to download
+ * @param scope - Medusa scope (container)
+ * @param logger - Logger instance
+ * @param imageCache - Cache mapping remote URLs to uploaded S3 URLs (shared across imports)
+ * @returns Uploaded file URL or null if failed
+ */
+async function downloadAndUploadImage(
+  url: string,
+  scope: any,
+  logger: Logger,
+  imageCache: Map<string, string>
+): Promise<string | null> {
+  try {
+    // Skip if URL is empty or not a remote URL (http/https)
+    if (!url || !url.trim()) {
+      return null
+    }
+
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+      // Not a remote URL, skip uploading (might be local path)
+      logger.debug(`Skipping non-remote URL: ${trimmedUrl}`)
+      return null
+    }
+
+    // Check cache first - if we've already uploaded this URL, reuse it
+    if (imageCache.has(trimmedUrl)) {
+      const cachedUrl = imageCache.get(trimmedUrl)!
+      logger.debug(`Using cached image for ${trimmedUrl} -> ${cachedUrl}`)
+      return cachedUrl
+    }
+
+    // Download the remote image
+    logger.debug(`Downloading image from ${trimmedUrl}...`)
+    const response = await fetch(trimmedUrl)
+    if (!response.ok) {
+      logger.warn(`Failed to download image from ${trimmedUrl}: ${response.statusText}`)
+      return null
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    // Prepare base64 content for uploadFilesWorkflow
+    const base64 = buffer.toString('base64')
+    const contentType = response.headers.get('content-type') || 'image/jpeg'
+
+    // Derive a filename from URL (fallback if none)
+    const urlParts = trimmedUrl.split('/')
+    const filename = urlParts[urlParts.length - 1] || `image-${Date.now()}.jpg`
+
+    // Upload to Medusa using uploadFilesWorkflow
+    const { result: files } = await uploadFilesWorkflow(scope).run({
+      input: {
+        files: [
+          {
+            filename,
+            mimeType: contentType,
+            content: base64,
+            access: 'public'
+          }
+        ]
+      }
+    })
+
+    const uploadedUrl = files[0]?.url
+    if (!uploadedUrl) {
+      logger.warn(`Upload workflow succeeded but no URL returned for ${trimmedUrl}`)
+      return null
+    }
+
+    logger.debug(`Successfully uploaded image: ${filename} -> ${uploadedUrl}`)
+
+    // Store in cache for future reuse
+    imageCache.set(trimmedUrl, uploadedUrl)
+
+    return uploadedUrl
+  } catch (error: any) {
+    logger.warn(`Error downloading/uploading image from ${url}: ${error.message}`)
+    return null
+  }
+}
 
 /**
  * Parse Variation Theme Name and extract column names
@@ -75,6 +161,7 @@ interface ImportContext {
   stockLocationId: string
   salesChannelId: string
   regionId: string
+  imageCache?: Map<string, string> // Maps remote URL -> uploaded S3 URL (shared across all imports in a batch)
 }
 
 /**
@@ -270,15 +357,54 @@ export async function importParentGroup(
       childImages.forEach((url) => allImageUrls.add(url))
     })
 
-    const images: { url: string }[] = Array.from(allImageUrls).map((url) => ({
-      url
-    }))
     logger.debug(
-      `[${parentSKU}] Collected ${images.length} unique images from parent and ${childRows.length} child rows`
+      `[${parentSKU}] Collected ${allImageUrls.size} unique remote image URLs from parent and ${childRows.length} child rows`
+    )
+    if (allImageUrls.size > 0) {
+      logger.debug(
+        `[${parentSKU}] Remote URLs: ${Array.from(allImageUrls)
+          .slice(0, 5)
+          .join(', ')}${allImageUrls.size > 5 ? '...' : ''}`
+      )
+    }
+
+    // Download and upload images to S3
+    // Use shared image cache to avoid downloading the same image multiple times across products
+    // Cache is initialized in importParentGroups and shared across all products in the batch
+    const imageCache = context.imageCache || new Map<string, string>()
+
+    // Create a local mapping of remote URL -> uploaded URL for variant metadata
+    const remoteToUploadedUrlMap = new Map<string, string>()
+    const allImageUrlsArray = Array.from(allImageUrls)
+
+    const images: { url: string }[] = []
+    for (let i = 0; i < allImageUrlsArray.length; i++) {
+      const remoteUrl = allImageUrlsArray[i]
+      logger.debug(`[${parentSKU}] Processing image ${i + 1}/${allImageUrlsArray.length}: ${remoteUrl}`)
+
+      const uploadedUrl = await downloadAndUploadImage(
+        remoteUrl,
+        scope, // Pass scope for uploadFilesWorkflow
+        logger,
+        imageCache // Pass shared cache
+      )
+
+      if (uploadedUrl) {
+        images.push({ url: uploadedUrl })
+        remoteToUploadedUrlMap.set(remoteUrl, uploadedUrl)
+      } else {
+        logger.warn(
+          `[${parentSKU}] Failed to upload image ${i + 1}/${allImageUrlsArray.length}, skipping`
+        )
+      }
+    }
+
+    logger.debug(
+      `[${parentSKU}] Successfully processed ${images.length}/${allImageUrlsArray.length} images`
     )
     if (images.length > 0) {
       logger.debug(
-        `[${parentSKU}] Image URLs: ${images
+        `[${parentSKU}] Uploaded image URLs: ${images
           .slice(0, 5)
           .map((img) => img.url)
           .join(', ')}${images.length > 5 ? '...' : ''}`
@@ -497,10 +623,17 @@ export async function importParentGroup(
       }
 
       // Extract variant-specific images and save to metadata
-      const variantImages = extractImages(childRow)
-      if (variantImages.length > 0) {
-        metadata.variant_images = variantImages.join(',') // Store as comma-separated string
-        metadata.variant_main_image = variantImages[0] // Store main image separately for easy access
+      // Map remote URLs to uploaded URLs
+      const variantRemoteImages = extractImages(childRow)
+      if (variantRemoteImages.length > 0) {
+        const variantUploadedImages = variantRemoteImages
+          .map((remoteUrl) => remoteToUploadedUrlMap.get(remoteUrl))
+          .filter((url): url is string => url !== undefined)
+
+        if (variantUploadedImages.length > 0) {
+          metadata.variant_images = variantUploadedImages.join(',') // Store as comma-separated string
+          metadata.variant_main_image = variantUploadedImages[0] // Store main image separately for easy access
+        }
       }
 
       return {
@@ -687,6 +820,7 @@ export async function importParentGroup(
           )
 
           // Merge: add new images that don't already exist
+          // Note: images are already uploaded to S3 at this point
           const imagesToAdd = images.filter(
             (img) => !existingImageUrls.has(img.url)
           )
@@ -695,7 +829,7 @@ export async function importParentGroup(
             ...imagesToAdd
           ]
 
-          if (mergedImages.length > 0) {
+          if (imagesToAdd.length > 0) {
             const { updateProductsWorkflow } =
               await import('@medusajs/medusa/core-flows')
             await updateProductsWorkflow(scope).run({
@@ -707,7 +841,11 @@ export async function importParentGroup(
               }
             })
             logger.debug(
-              `[${parentSKU}] ✓ Updated product images (${mergedImages.length} total images)`
+              `[${parentSKU}] ✓ Updated product images (${mergedImages.length} total images, ${imagesToAdd.length} new)`
+            )
+          } else {
+            logger.debug(
+              `[${parentSKU}] ℹ️  All images already exist, skipping update`
             )
           }
         } catch (imageUpdateError: any) {
@@ -797,6 +935,7 @@ export async function importParentGroup(
                   )
 
                   // Merge: add new images that don't already exist
+                  // Note: images are already uploaded to S3 at this point
                   const imagesToAdd = images.filter(
                     (img) => !existingImageUrls.has(img.url)
                   )
@@ -805,7 +944,7 @@ export async function importParentGroup(
                     ...imagesToAdd
                   ]
 
-                  if (mergedImages.length > 0) {
+                  if (imagesToAdd.length > 0) {
                     const { updateProductsWorkflow } =
                       await import('@medusajs/medusa/core-flows')
                     await updateProductsWorkflow(scope).run({
@@ -817,7 +956,11 @@ export async function importParentGroup(
                       }
                     })
                     logger.debug(
-                      `[${parentSKU}] ✓ Updated product images (${mergedImages.length} total images)`
+                      `[${parentSKU}] ✓ Updated product images (${mergedImages.length} total images, ${imagesToAdd.length} new)`
+                    )
+                  } else {
+                    logger.debug(
+                      `[${parentSKU}] ℹ️  All images already exist, skipping update`
                     )
                   }
                 } catch (imageUpdateError: any) {
@@ -1315,6 +1458,13 @@ export async function importParentGroups(
     errors: [] as Array<{ parentSKU: string; error: string }>
   }
 
+  // Initialize shared image cache for this batch import
+  // This prevents downloading the same image multiple times across different products
+  if (!context.imageCache) {
+    context.imageCache = new Map<string, string>()
+    logger.debug('Initialized shared image cache for batch import')
+  }
+
   for (let i = 0; i < groups.length; i++) {
     const group = groups[i]
     logger.debug(
@@ -1339,6 +1489,13 @@ export async function importParentGroups(
         `   ❌ [Import Progress] Failed to import ${group.parentSKU}: ${errorMsg}`
       )
     }
+  }
+
+  // Log cache statistics
+  if (context.imageCache) {
+    logger.info(
+      `\n📊 Image cache statistics: ${context.imageCache.size} unique images uploaded and cached`
+    )
   }
 
   return results
