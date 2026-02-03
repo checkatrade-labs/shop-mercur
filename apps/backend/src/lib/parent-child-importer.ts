@@ -37,96 +37,95 @@ import {
 const MAX_IMAGE_DIMENSION = 1500
 
 /**
- * Supported image MIME types
+ * Supported image formats (sharp format names to MIME types and extensions)
  */
-const SUPPORTED_IMAGE_MIMES = {
-  'image/jpeg': '.jpg',
-  'image/jpg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-  'image/svg+xml': '.svg',
-  'image/bmp': '.bmp',
-  'image/tiff': '.tiff',
-  'image/x-icon': '.ico'
+const SHARP_FORMAT_TO_MIME: Record<string, { mime: string; ext: string }> = {
+  'jpeg': { mime: 'image/jpeg', ext: '.jpg' },
+  'jpg': { mime: 'image/jpeg', ext: '.jpg' },
+  'png': { mime: 'image/png', ext: '.png' },
+  'webp': { mime: 'image/webp', ext: '.webp' },
+  'gif': { mime: 'image/gif', ext: '.gif' },
+  'svg': { mime: 'image/svg+xml', ext: '.svg' },
+  'tiff': { mime: 'image/tiff', ext: '.tiff' },
+  'tif': { mime: 'image/tiff', ext: '.tiff' },
+  'avif': { mime: 'image/avif', ext: '.avif' },
+  'heif': { mime: 'image/heif', ext: '.heif' }
 } as const
 
 /**
- * Get file extension from MIME type
+ * Detect image format and metadata using sharp
+ * @param buffer - Image buffer
+ * @param logger - Logger instance
+ * @returns Object with format, mimeType, width, height, or null if invalid
  */
-function getExtensionFromMimeType(mimeType: string): string {
-  return SUPPORTED_IMAGE_MIMES[mimeType as keyof typeof SUPPORTED_IMAGE_MIMES] || '.jpg'
-}
+async function detectImageWithSharp(
+  buffer: Buffer,
+  logger: Logger
+): Promise<{
+  format: string
+  mimeType: string
+  extension: string
+  width: number
+  height: number
+  size: number
+} | null> {
+  try {
+    const image = sharp(buffer)
+    const metadata = await image.metadata()
 
-/**
- * Detect image MIME type from buffer (magic numbers)
- * Fallback for when Content-Type header is missing or incorrect
- */
-function detectImageMimeType(buffer: Buffer): string | null {
-  // Check magic numbers (file signatures)
-  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
-    return 'image/jpeg'
-  }
-  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
-    return 'image/png'
-  }
-  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
-    // RIFF format, check for WEBP
-    if (buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
-      return 'image/webp'
+    if (!metadata.format) {
+      logger.warn('Sharp could not detect image format')
+      return null
     }
-  }
-  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
-    return 'image/gif'
-  }
-  if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
-    return 'image/bmp'
-  }
-  if ((buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2A && buffer[3] === 0x00) ||
-      (buffer[0] === 0x4D && buffer[1] === 0x4D && buffer[2] === 0x00 && buffer[3] === 0x2A)) {
-    return 'image/tiff'
-  }
-  if (buffer[0] === 0x3C && buffer[1] === 0x3F && buffer[2] === 0x78 && buffer[3] === 0x6D) {
-    // Check for SVG (starts with <?xml)
-    return 'image/svg+xml'
-  }
-  if (buffer[0] === 0x3C && buffer[1] === 0x73 && buffer[2] === 0x76 && buffer[3] === 0x67) {
-    // Check for SVG (starts with <svg)
-    return 'image/svg+xml'
-  }
 
-  return null
+    const formatInfo = SHARP_FORMAT_TO_MIME[metadata.format]
+    if (!formatInfo) {
+      logger.warn(`Unsupported image format detected by sharp: ${metadata.format}`)
+      return null
+    }
+
+    return {
+      format: metadata.format,
+      mimeType: formatInfo.mime,
+      extension: formatInfo.ext,
+      width: metadata.width || 0,
+      height: metadata.height || 0,
+      size: buffer.length
+    }
+  } catch (error: any) {
+    logger.warn(`Sharp failed to parse image: ${error.message}`)
+    return null
+  }
 }
 
 /**
  * Resize image if it exceeds maximum dimensions while maintaining aspect ratio
  * @param buffer - Image buffer
- * @param mimeType - Image MIME type
+ * @param format - Sharp image format
+ * @param width - Image width
+ * @param height - Image height
  * @param logger - Logger instance
  * @returns Resized image buffer or original if no resize needed
  */
 async function resizeImageIfNeeded(
   buffer: Buffer,
-  mimeType: string,
+  format: string,
+  width: number,
+  height: number,
   logger: Logger
 ): Promise<Buffer> {
   try {
     // Skip resizing for SVG (vector format, doesn't need resizing)
-    if (mimeType === 'image/svg+xml') {
+    if (format === 'svg') {
       logger.debug('Skipping resize for SVG (vector format)')
       return buffer
     }
 
-    // Get image metadata
-    const image = sharp(buffer)
-    const metadata = await image.metadata()
-
-    if (!metadata.width || !metadata.height) {
-      logger.warn('Could not read image dimensions, skipping resize')
+    // Skip resizing for GIF to preserve animation
+    if (format === 'gif') {
+      logger.debug('Skipping resize for GIF to preserve animation')
       return buffer
     }
-
-    const { width, height } = metadata
 
     // Check if resize is needed
     if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
@@ -152,34 +151,35 @@ async function resizeImageIfNeeded(
       `Resizing image from ${width}x${height} to ${newWidth}x${newHeight} (maintaining aspect ratio)`
     )
 
-    // Resize image based on format
-    let resizedImage = image.resize(newWidth, newHeight, {
+    // Resize image and preserve original format
+    let resizedImage = sharp(buffer).resize(newWidth, newHeight, {
       fit: 'inside', // Ensure image fits within dimensions
       withoutEnlargement: true // Don't upscale small images
     })
 
-    // Convert to appropriate format
-    switch (mimeType) {
-      case 'image/jpeg':
-      case 'image/jpg':
-        resizedImage = resizedImage.jpeg({ quality: 90 })
+    // Apply format-specific encoding
+    switch (format) {
+      case 'jpeg':
+      case 'jpg':
+        resizedImage = resizedImage.jpeg({ quality: 90, mozjpeg: true })
         break
-      case 'image/png':
-        resizedImage = resizedImage.png({ quality: 90 })
+      case 'png':
+        resizedImage = resizedImage.png({ quality: 90, compressionLevel: 9 })
         break
-      case 'image/webp':
+      case 'webp':
         resizedImage = resizedImage.webp({ quality: 90 })
         break
-      case 'image/gif':
-        // Sharp doesn't handle animated GIFs well, keep original
-        logger.debug('GIF detected, skipping resize to preserve animation')
-        return buffer
-      case 'image/tiff':
+      case 'tiff':
+      case 'tif':
         resizedImage = resizedImage.tiff({ quality: 90 })
         break
+      case 'avif':
+        resizedImage = resizedImage.avif({ quality: 90 })
+        break
       default:
-        // For other formats, convert to JPEG
-        resizedImage = resizedImage.jpeg({ quality: 90 })
+        // For any other format, convert to JPEG
+        logger.debug(`Converting ${format} to JPEG during resize`)
+        resizedImage = resizedImage.jpeg({ quality: 90, mozjpeg: true })
     }
 
     const resizedBuffer = await resizedImage.toBuffer()
@@ -250,24 +250,20 @@ async function downloadAndUploadImage(
       return null
     }
 
-    // Detect MIME type from Content-Type header or buffer magic numbers
-    let mimeType = response.headers.get('content-type')?.split(';')[0].trim() || null
-
-    // Validate MIME type is a supported image format
-    if (!mimeType || !SUPPORTED_IMAGE_MIMES[mimeType as keyof typeof SUPPORTED_IMAGE_MIMES]) {
-      // Try to detect from buffer
-      const detectedMime = detectImageMimeType(buffer)
-      if (detectedMime) {
-        logger.debug(`Detected image format from file content: ${detectedMime}`)
-        mimeType = detectedMime
-      } else {
-        logger.warn(`Unsupported or undetected image format for ${trimmedUrl} (Content-Type: ${mimeType})`)
-        return null
-      }
+    // Detect image format and metadata using sharp
+    const imageInfo = await detectImageWithSharp(buffer, logger)
+    if (!imageInfo) {
+      logger.warn(`Could not detect valid image format for ${trimmedUrl}`)
+      return null
     }
 
+    const { format, mimeType, extension, width, height, size } = imageInfo
+    logger.debug(
+      `Detected image: ${format.toUpperCase()} ${width}x${height} (${(size / 1024).toFixed(2)} KB)`
+    )
+
     // Resize image if it exceeds maximum dimensions (1500x1500)
-    buffer = await resizeImageIfNeeded(buffer, mimeType, logger)
+    buffer = await resizeImageIfNeeded(buffer, format, width, height, logger)
 
     // Prepare base64 content for uploadFilesWorkflow
     const base64 = buffer.toString('base64')
@@ -276,19 +272,22 @@ async function downloadAndUploadImage(
     const urlParts = trimmedUrl.split('/')
     let filename = urlParts[urlParts.length - 1]?.split('?')[0] || '' // Remove query params
 
-    // Ensure filename has correct extension based on MIME type
-    const correctExtension = getExtensionFromMimeType(mimeType)
+    // Ensure filename has correct extension based on detected format
     if (!filename || filename === '') {
       // No filename in URL, generate one
-      filename = `image-${Date.now()}${correctExtension}`
-    } else if (!filename.toLowerCase().endsWith(correctExtension)) {
-      // Filename exists but wrong/missing extension, fix it
-      const filenameParts = filename.split('.')
-      if (filenameParts.length > 1) {
-        filenameParts[filenameParts.length - 1] = correctExtension.slice(1) // Remove leading dot
-        filename = filenameParts.join('.')
-      } else {
-        filename = `${filename}${correctExtension}`
+      filename = `image-${Date.now()}${extension}`
+    } else {
+      // Ensure correct extension
+      const currentExt = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
+      if (currentExt !== extension) {
+        // Wrong or missing extension, fix it
+        if (currentExt) {
+          // Replace wrong extension
+          filename = filename.replace(/\.[^.]+$/, extension)
+        } else {
+          // Add missing extension
+          filename = `${filename}${extension}`
+        }
       }
     }
 
