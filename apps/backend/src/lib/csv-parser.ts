@@ -118,10 +118,14 @@ export type ProductListingActionType = typeof ProductListingAction[keyof typeof 
 
 /**
  * Check if a listing action value matches a constant (case-insensitive)
+ * Supports partial matches like "Edit (Partial Update)" matching "Edit"
  */
 export function isListingAction(value: string, action: ProductListingActionType): boolean {
   if (!value || !value.trim()) return action === ProductListingAction.CREATE // Default to CREATE
-  return normalizeColumnName(value) === normalizeColumnName(action)
+  const normalizedValue = normalizeColumnName(value)
+  const normalizedAction = normalizeColumnName(action)
+  // Check if the value starts with the action (handles "Edit (Partial Update)" matching "Edit")
+  return normalizedValue === normalizedAction || normalizedValue.startsWith(normalizedAction + ' ')
 }
 
 /**

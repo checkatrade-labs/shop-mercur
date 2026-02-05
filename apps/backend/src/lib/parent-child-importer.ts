@@ -619,64 +619,34 @@ async function handleEditAction(
       logger.debug(`[${parentSKU}] Child deletion result: ${deleteResult.deletedCount} deleted, ${deleteResult.errors.length} errors`)
     }
 
-    // Generate handle to find product
-    const productTitle = parentRow[CSVColumn.PRODUCT_NAME] || `Product ${parentSKU}`
-    const handle = generateHandle(productTitle, parentSKU)
-
-    // Find existing product by handle
+    // Find product by parent_sku in metadata (unique identifier)
     let product: any = null
-    try {
-      const { data } = await query.graph({
-        entity: 'product',
-        fields: [
-          'id', 'handle', 'title', 'description', 'status', 'thumbnail', 'metadata',
-          'images.id', 'images.url',
-          'categories.id',
-          'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
-          'variants.prices.id', 'variants.prices.amount', 'variants.prices.currency_code',
-          'variants.options.id', 'variants.options.value', 'variants.options.option.title'
-        ],
-        filters: { handle }
-      })
-      if (data && data.length > 0) {
-        product = data[0]
-      }
-    } catch (error: any) {
-      logger.debug(`[${parentSKU}] Could not find product by handle: ${error.message}`)
-    }
 
-    // If not found by handle, try finding by variant SKU
-    if (!product) {
-      const variantSkus = childRows.map((row) => row[CSVColumn.SKU]).filter(Boolean)
-      if (variantSkus.length > 0) {
-        try {
-          const { data: variantData } = await query.graph({
-            entity: 'product_variant',
-            fields: ['id', 'sku', 'product_id'],
-            filters: { sku: variantSkus }
-          })
-          if (variantData && variantData.length > 0) {
-            const productId = variantData[0].product_id
-            const { data: productData } = await query.graph({
-              entity: 'product',
-              fields: [
-                'id', 'handle', 'title', 'description', 'status', 'thumbnail', 'metadata',
-                'images.id', 'images.url',
-                'categories.id',
-                'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
-                'variants.prices.id', 'variants.prices.amount', 'variants.prices.currency_code',
-                'variants.options.id', 'variants.options.value', 'variants.options.option.title'
-              ],
-              filters: { id: productId }
-            })
-            if (productData && productData.length > 0) {
-              product = productData[0]
-            }
-          }
-        } catch (error: any) {
-          logger.debug(`[${parentSKU}] Could not find product by variant SKU: ${error.message}`)
+    try {
+      const products = await productModule.listProducts({
+        metadata: { parent_sku: parentSKU }
+      })
+
+      if (products && products.length > 0) {
+        const { data: productData } = await query.graph({
+          entity: 'product',
+          fields: [
+            'id', 'handle', 'title', 'description', 'status', 'thumbnail', 'metadata',
+            'images.id', 'images.url',
+            'categories.id',
+            'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
+            'variants.prices.id', 'variants.prices.amount', 'variants.prices.currency_code',
+            'variants.options.id', 'variants.options.value', 'variants.options.option.title'
+          ],
+          filters: { id: products[0].id }
+        })
+        if (productData && productData.length > 0) {
+          product = productData[0]
+          logger.debug(`[${parentSKU}] Found product: ${product.id} with ${product.variants?.length || 0} variants`)
         }
       }
+    } catch (error: any) {
+      logger.error(`[${parentSKU}] ❌ Error finding product: ${error.message}`)
     }
 
     if (!product) {
@@ -697,7 +667,6 @@ async function handleEditAction(
     const newTitle = parentRow[CSVColumn.PRODUCT_NAME] || ''
     if (newTitle && newTitle.trim() !== '' && newTitle !== product.title) {
       productUpdates.title = newTitle
-      logger.debug(`[${parentSKU}]   Title changed: "${product.title}" → "${newTitle}"`)
     }
 
     // Check description
@@ -787,16 +756,18 @@ async function handleEditAction(
 
     // Update product if there are changes
     if (Object.keys(productUpdates).length > 0) {
-      const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
-      await updateProductsWorkflow(scope).run({
-        input: {
-          selector: { id: productId },
-          update: productUpdates
-        }
-      })
-      logger.debug(`[${parentSKU}] ✓ Updated product with ${Object.keys(productUpdates).length} field(s)`)
-    } else {
-      logger.debug(`[${parentSKU}] No product-level changes detected`)
+      try {
+        const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+        await updateProductsWorkflow(scope).run({
+          input: {
+            selector: { id: productId },
+            update: productUpdates
+          }
+        })
+        logger.debug(`[${parentSKU}] ✓ Updated product: ${Object.keys(productUpdates).join(', ')}`)
+      } catch (updateError: any) {
+        logger.error(`[${parentSKU}] ❌ Failed to update product: ${updateError.message}`)
+      }
     }
 
     // Update variants
@@ -824,17 +795,12 @@ async function handleEditAction(
       const newVariantTitle = childRow[CSVColumn.PRODUCT_NAME] || ''
       if (newVariantTitle && newVariantTitle !== existingVariant.title) {
         variantUpdates.title = newVariantTitle
-        logger.debug(`[${parentSKU}]   Variant ${sku} title changed: "${existingVariant.title}" → "${newVariantTitle}"`)
       }
 
       // Check price - will be updated separately using upsertVariantPricesWorkflow
       const newPrice = extractPrice(childRow)
       const existingPrice = existingVariant.prices?.[0]?.amount || 0
       const priceChanged = newPrice !== existingPrice
-
-      if (priceChanged) {
-        logger.debug(`[${parentSKU}]   Variant ${sku} price changed: ${existingPrice} → ${newPrice}`)
-      }
 
       // Note: Variant options cannot be updated after creation in Medusa.
       // To change options, delete and recreate the variant.
@@ -870,13 +836,11 @@ async function handleEditAction(
       for (const [key, value] of Object.entries(newMetadata)) {
         if (existingMetadata[key] !== value) {
           metadataChanged = true
-          logger.debug(`[${parentSKU}]   Variant ${sku} metadata.${key} changed`)
           break
         }
       }
       if (metadataChanged) {
         variantUpdates.metadata = { ...existingMetadata, ...newMetadata }
-        logger.debug(`[${parentSKU}]   Variant ${sku} metadata will be updated`)
       }
 
       // Update variant fields (title, metadata) if there are changes
@@ -890,9 +854,9 @@ async function handleEditAction(
               update: variantUpdates
             }
           })
-          logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku}`)
+          logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku}: ${Object.keys(variantUpdates).join(', ')}`)
         } catch (variantError: any) {
-          logger.warn(`[${parentSKU}]   ⚠️  Failed to update variant ${sku}: ${variantError.message}`)
+          logger.error(`[${parentSKU}]   ❌ Failed to update variant ${sku}: ${variantError.message}`)
         }
       }
 
