@@ -779,15 +779,17 @@ async function handleEditAction(
       }
     })
 
+    let variantsUpdated = 0
+    let pricesUpdated = 0
+    let inventoryUpdated = 0
+    let variantErrors = 0
+
     for (const childRow of childRowsToProcess) {
       const sku = childRow[CSVColumn.SKU]
       if (!sku) continue
 
       const existingVariant = existingVariantMap.get(sku)
-      if (!existingVariant) {
-        logger.debug(`[${parentSKU}]   Variant ${sku} not found in product, skipping`)
-        continue
-      }
+      if (!existingVariant) continue
 
       const variantUpdates: any = {}
 
@@ -854,9 +856,9 @@ async function handleEditAction(
               update: variantUpdates
             }
           })
-          logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku}: ${Object.keys(variantUpdates).join(', ')}`)
+          variantsUpdated++
         } catch (variantError: any) {
-          logger.error(`[${parentSKU}]   ❌ Failed to update variant ${sku}: ${variantError.message}`)
+          variantErrors++
         }
       }
 
@@ -877,9 +879,10 @@ async function handleEditAction(
               previousVariantIds: []
             }
           })
-          logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku} price`)
+          pricesUpdated++
         } catch (priceError: any) {
-          logger.warn(`[${parentSKU}]   ⚠️  Failed to update price for ${sku}: ${priceError.message}`)
+          logger.warn(`[${parentSKU}] ⚠️ Failed to update price for ${sku}: ${priceError.message}`)
+          variantErrors++
         }
       }
 
@@ -901,16 +904,28 @@ async function handleEditAction(
                 id: existingLevel.id,
                 stocked_quantity: newQuantity
               }])
-              logger.debug(`[${parentSKU}]   Variant ${sku} inventory changed: ${existingLevel.stocked_quantity} → ${newQuantity}`)
+              inventoryUpdated++
             }
           }
         }
       } catch (invError: any) {
-        logger.warn(`[${parentSKU}]   ⚠️  Failed to update inventory for ${sku}: ${invError.message}`)
+        logger.warn(`[${parentSKU}] ⚠️ Failed to update inventory for ${sku}: ${invError.message}`)
+        variantErrors++
       }
     }
 
-    logger.info(`[${parentSKU}] ✓ Successfully completed EDIT action for product ${productId}`)
+    // Log summary
+    const updates: string[] = []
+    if (Object.keys(productUpdates).length > 0) updates.push(`product: ${Object.keys(productUpdates).join(', ')}`)
+    if (variantsUpdated > 0) updates.push(`${variantsUpdated} variants`)
+    if (pricesUpdated > 0) updates.push(`${pricesUpdated} prices`)
+    if (inventoryUpdated > 0) updates.push(`${inventoryUpdated} inventory levels`)
+
+    if (updates.length > 0) {
+      logger.info(`[${parentSKU}] ✓ EDIT completed: ${updates.join(', ')}${variantErrors > 0 ? ` (${variantErrors} errors)` : ''}`)
+    } else {
+      logger.debug(`[${parentSKU}] EDIT: No changes detected`)
+    }
 
     return {
       success: true,
