@@ -781,7 +781,7 @@ async function handleEditAction(
       const newVariantTitle = childRow[CSVColumn.PRODUCT_NAME] || ''
       if (newVariantTitle && newVariantTitle !== existingVariant.title) {
         variantUpdates.title = newVariantTitle
-        logger.debug(`[${parentSKU}]   Variant ${sku} title changed`)
+        logger.debug(`[${parentSKU}]   Variant ${sku} title changed: "${existingVariant.title}" → "${newVariantTitle}"`)
       }
 
       // Check price
@@ -795,19 +795,47 @@ async function handleEditAction(
         logger.debug(`[${parentSKU}]   Variant ${sku} price changed: ${existingPrice} → ${newPrice}`)
       }
 
-      // Check metadata
+      // Note: Variant options cannot be updated after creation in Medusa.
+      // To change options, delete and recreate the variant.
+
+      // Check metadata (including variant images and bullet points)
       const newMetadata = extractVariantMetadata(childRow)
+
+      // Extract variant-specific images
+      const variantImages = extractImages(childRow)
+      if (variantImages.length > 0) {
+        // Download and upload new variant images
+        const uploadedVariantImages: string[] = []
+        for (const remoteUrl of variantImages) {
+          const uploadedUrl = await downloadAndUploadImage(remoteUrl, scope, logger, imageCache)
+          if (uploadedUrl) {
+            uploadedVariantImages.push(uploadedUrl)
+          }
+        }
+        if (uploadedVariantImages.length > 0) {
+          newMetadata.variant_images = uploadedVariantImages.join(',')
+          newMetadata.variant_main_image = uploadedVariantImages[0]
+        }
+      }
+
+      // Add bullet points to metadata if present
+      const bulletPoints = childRow[CSVColumn.BULLET_POINTS] || ''
+      if (bulletPoints.trim()) {
+        newMetadata.bullet_points = bulletPoints.trim()
+      }
+
       const existingMetadata = existingVariant.metadata || {}
       let metadataChanged = false
       for (const [key, value] of Object.entries(newMetadata)) {
         if (existingMetadata[key] !== value) {
           metadataChanged = true
+          logger.debug(`[${parentSKU}]   Variant ${sku} metadata.${key} changed`)
           break
         }
       }
       if (metadataChanged) {
         variantUpdates.metadata = { ...existingMetadata, ...newMetadata }
-        logger.debug(`[${parentSKU}]   Variant ${sku} metadata changed`)
+        logger.debug(`[${parentSKU}]   Variant ${sku} metadata will be updated`)
       }
 
       // Update variant if there are changes
