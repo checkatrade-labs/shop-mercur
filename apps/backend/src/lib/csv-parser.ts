@@ -108,13 +108,21 @@ export const ProductStatus = {
 export type ProductStatusType = typeof ProductStatus[keyof typeof ProductStatus]
 
 export const ProductListingAction = {
-  CREATE_OR_REPLACE: 'Create or Replace (Full Update)',
-  EDIT: 'Edit (Partial Update)',
+  CREATE: 'Create',
+  EDIT: 'Edit',
   DELETE: 'Delete',
-  NO_ACTION: 'No action'
+  IGNORE: 'Ignore'
 } as const
 
 export type ProductListingActionType = typeof ProductListingAction[keyof typeof ProductListingAction]
+
+/**
+ * Check if a listing action value matches a constant (case-insensitive)
+ */
+export function isListingAction(value: string, action: ProductListingActionType): boolean {
+  if (!value || !value.trim()) return action === ProductListingAction.CREATE // Default to CREATE
+  return normalizeColumnName(value) === normalizeColumnName(action)
+}
 
 /**
  * Base variant attributes

@@ -19,16 +19,18 @@ import {
 import { AttributeUIComponent } from '@mercurjs/framework'
 
 import { getCategoryForProductType } from './category-mapping'
-import type { CSVRow, ParentGroup } from './csv-parser'
+import type { CSVRow, ParentGroup, ProductListingActionType } from './csv-parser'
 import {
   CSVColumn,
+  ProductListingAction,
   ProductVariationTheme,
   extractAttributes,
   extractImages,
   extractPrice,
   extractProductMetadata,
   extractQuantity,
-  extractVariantMetadata
+  extractVariantMetadata,
+  isListingAction
 } from './csv-parser'
 
 /**
@@ -374,6 +376,486 @@ interface ImportContext {
 }
 
 /**
+ * Result of importing a parent group
+ */
+interface ImportResult {
+  success: boolean
+  productId?: string
+  error?: string
+  skipped?: boolean  // true for Ignore action
+  action?: ProductListingActionType  // which action was performed
+}
+
+/**
+ * Generate a URL-friendly handle from a product title
+ */
+function generateHandle(title: string, sku: string): string {
+  let handle = title
+    .toLowerCase()
+    .replace(/\|/g, ' ') // Replace pipes with spaces first
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .substring(0, 200) // Limit length
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens AFTER substring
+
+  // Ensure we don't have an empty handle
+  if (!handle || handle === '') {
+    handle = `product-${sku.toLowerCase()}`
+  }
+
+  return handle
+}
+
+/**
+ * Handle DELETE action: Delete product and all its variants, inventory items, and links
+ */
+async function handleDeleteAction(
+  group: ParentGroup,
+  context: ImportContext,
+  logger: Logger,
+  scope: any,
+): Promise<ImportResult> {
+  const { parentRow, parentSKU } = group
+  const { sellerId } = context
+
+  logger.debug(`[${parentSKU}] 🗑️  Handling DELETE action`)
+
+  try {
+    const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+    const query = scope.resolve(ContainerRegistrationKeys.QUERY)
+    const inventoryModule = scope.resolve(Modules.INVENTORY)
+    const remoteLink = scope.resolve('remoteLink')
+    const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
+
+    // Generate handle to find product
+    const productTitle = parentRow[CSVColumn.PRODUCT_NAME] || `Product ${parentSKU}`
+    const handle = generateHandle(productTitle, parentSKU)
+
+    // Find product by handle
+    let product: any = null
+    try {
+      const { data } = await query.graph({
+        entity: 'product',
+        fields: ['id', 'handle', 'title', 'variants.id', 'variants.sku'],
+        filters: { handle }
+      })
+      if (data && data.length > 0) {
+        product = data[0]
+      }
+    } catch (error: any) {
+      logger.debug(`[${parentSKU}] Could not find product by handle: ${error.message}`)
+    }
+
+    // If not found by handle, try finding by variant SKU
+    if (!product) {
+      const variantSkus = group.childRows.map((row) => row[CSVColumn.SKU]).filter(Boolean)
+      if (variantSkus.length > 0) {
+        try {
+          const { data: variantData } = await query.graph({
+            entity: 'product_variant',
+            fields: ['id', 'sku', 'product_id'],
+            filters: { sku: variantSkus }
+          })
+          if (variantData && variantData.length > 0) {
+            const productId = variantData[0].product_id
+            const { data: productData } = await query.graph({
+              entity: 'product',
+              fields: ['id', 'handle', 'title', 'variants.id', 'variants.sku'],
+              filters: { id: productId }
+            })
+            if (productData && productData.length > 0) {
+              product = productData[0]
+            }
+          }
+        } catch (error: any) {
+          logger.debug(`[${parentSKU}] Could not find product by variant SKU: ${error.message}`)
+        }
+      }
+    }
+
+    if (!product) {
+      logger.warn(`[${parentSKU}] ⚠️  Product not found for deletion, nothing to delete`)
+      return {
+        success: true,
+        skipped: true,
+        action: ProductListingAction.DELETE
+      }
+    }
+
+    const productId = product.id
+    const variants = product.variants || []
+
+    logger.debug(`[${parentSKU}] Found product ${productId} with ${variants.length} variants to delete`)
+
+    // Delete inventory for each variant
+    for (const variant of variants) {
+      try {
+        // Find linked inventory item
+        const existingItems = await inventoryModule.listInventoryItems({
+          sku: variant.sku
+        })
+
+        if (existingItems && existingItems.length > 0) {
+          const inventoryItemId = existingItems[0].id
+
+          // 1. Delete inventory levels at all locations
+          const levels = await inventoryModule.listInventoryLevels({
+            inventory_item_id: inventoryItemId
+          })
+
+          if (levels && levels.length > 0) {
+            const levelIds = levels.map((l: any) => l.id)
+            await inventoryModule.deleteInventoryLevels(levelIds)
+            logger.debug(`[${parentSKU}]   Deleted ${levelIds.length} inventory levels for variant ${variant.sku}`)
+          }
+
+          // 2. Remove variant ↔ inventory link
+          try {
+            await remoteLink.dismiss({
+              [Modules.PRODUCT]: {
+                variant_id: variant.id
+              },
+              [Modules.INVENTORY]: {
+                inventory_item_id: inventoryItemId
+              }
+            })
+          } catch (linkError: any) {
+            logger.debug(`[${parentSKU}]   Could not remove variant-inventory link: ${linkError.message}`)
+          }
+
+          // 3. Remove seller ↔ inventory link
+          try {
+            await knex('seller_seller_inventory_inventory_item')
+              .where({
+                seller_id: sellerId,
+                inventory_item_id: inventoryItemId
+              })
+              .del()
+          } catch (linkError: any) {
+            logger.debug(`[${parentSKU}]   Could not remove seller-inventory link: ${linkError.message}`)
+          }
+
+          // 4. Delete inventory item
+          await inventoryModule.deleteInventoryItems([inventoryItemId])
+          logger.debug(`[${parentSKU}]   Deleted inventory item for variant ${variant.sku}`)
+        }
+      } catch (invError: any) {
+        logger.warn(`[${parentSKU}]   ⚠️  Error deleting inventory for variant ${variant.sku}: ${invError.message}`)
+        // Continue with other variants
+      }
+    }
+
+    // Remove product ↔ seller link
+    try {
+      await knex('seller_seller_product_product')
+        .where({
+          seller_id: sellerId,
+          product_id: productId
+        })
+        .del()
+      logger.debug(`[${parentSKU}] Removed product-seller link`)
+    } catch (linkError: any) {
+      logger.debug(`[${parentSKU}] Could not remove product-seller link: ${linkError.message}`)
+    }
+
+    // Delete product (this cascades to variants)
+    const { deleteProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+    await deleteProductsWorkflow(scope).run({
+      input: { ids: [productId] }
+    })
+
+    logger.info(`[${parentSKU}] ✓ Successfully deleted product ${productId} and all associated data`)
+
+    return {
+      success: true,
+      productId,
+      action: ProductListingAction.DELETE
+    }
+  } catch (error: any) {
+    logger.error(`[${parentSKU}] ❌ Delete action failed: ${error.message}`)
+    return {
+      success: false,
+      error: `Delete failed: ${error.message}`,
+      action: ProductListingAction.DELETE
+    }
+  }
+}
+
+/**
+ * Handle EDIT action: Partial update - only update fields that differ from existing values
+ */
+async function handleEditAction(
+  group: ParentGroup,
+  context: ImportContext,
+  logger: Logger,
+  scope: any,
+  productModule: any,
+  imageCache: Map<string, string>
+): Promise<ImportResult> {
+  const { parentRow, childRows, parentSKU } = group
+  const { stockLocationId } = context
+
+  logger.debug(`[${parentSKU}] ✏️  Handling EDIT action`)
+
+  try {
+    const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+    const query = scope.resolve(ContainerRegistrationKeys.QUERY)
+    const inventoryModule = scope.resolve(Modules.INVENTORY)
+
+    // Generate handle to find product
+    const productTitle = parentRow[CSVColumn.PRODUCT_NAME] || `Product ${parentSKU}`
+    const handle = generateHandle(productTitle, parentSKU)
+
+    // Find existing product by handle
+    let product: any = null
+    try {
+      const { data } = await query.graph({
+        entity: 'product',
+        fields: [
+          'id', 'handle', 'title', 'description', 'status',
+          'images.id', 'images.url',
+          'categories.id',
+          'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
+          'variants.prices.id', 'variants.prices.amount', 'variants.prices.currency_code',
+          'variants.options.id', 'variants.options.value', 'variants.options.option.title'
+        ],
+        filters: { handle }
+      })
+      if (data && data.length > 0) {
+        product = data[0]
+      }
+    } catch (error: any) {
+      logger.debug(`[${parentSKU}] Could not find product by handle: ${error.message}`)
+    }
+
+    // If not found by handle, try finding by variant SKU
+    if (!product) {
+      const variantSkus = childRows.map((row) => row[CSVColumn.SKU]).filter(Boolean)
+      if (variantSkus.length > 0) {
+        try {
+          const { data: variantData } = await query.graph({
+            entity: 'product_variant',
+            fields: ['id', 'sku', 'product_id'],
+            filters: { sku: variantSkus }
+          })
+          if (variantData && variantData.length > 0) {
+            const productId = variantData[0].product_id
+            const { data: productData } = await query.graph({
+              entity: 'product',
+              fields: [
+                'id', 'handle', 'title', 'description', 'status',
+                'images.id', 'images.url',
+                'categories.id',
+                'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
+                'variants.prices.id', 'variants.prices.amount', 'variants.prices.currency_code',
+                'variants.options.id', 'variants.options.value', 'variants.options.option.title'
+              ],
+              filters: { id: productId }
+            })
+            if (productData && productData.length > 0) {
+              product = productData[0]
+            }
+          }
+        } catch (error: any) {
+          logger.debug(`[${parentSKU}] Could not find product by variant SKU: ${error.message}`)
+        }
+      }
+    }
+
+    if (!product) {
+      logger.warn(`[${parentSKU}] ⚠️  Product not found for edit, nothing to update`)
+      return {
+        success: false,
+        error: 'Product not found for edit action',
+        action: ProductListingAction.EDIT
+      }
+    }
+
+    const productId = product.id
+
+    // Build product updates - only include fields that differ
+    const productUpdates: any = {}
+
+    // Check title
+    const newTitle = parentRow[CSVColumn.PRODUCT_NAME] || ''
+    if (newTitle && newTitle.trim() !== '' && newTitle !== product.title) {
+      productUpdates.title = newTitle
+      logger.debug(`[${parentSKU}]   Title changed: "${product.title}" → "${newTitle}"`)
+    }
+
+    // Check description
+    let newDescription = parentRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
+    if (!newDescription.trim() && childRows.length > 0) {
+      // Try to get from first child row
+      newDescription = childRows[0][CSVColumn.PRODUCT_DESCRIPTION] || ''
+    }
+    if (newDescription && newDescription.trim() !== '' && newDescription !== product.description) {
+      productUpdates.description = newDescription
+      logger.debug(`[${parentSKU}]   Description changed`)
+    }
+
+    // Check and update images
+    const newImageUrls = extractImages(parentRow)
+    childRows.forEach((childRow) => {
+      const childImages = extractImages(childRow)
+      childImages.forEach((url) => {
+        if (!newImageUrls.includes(url)) {
+          newImageUrls.push(url)
+        }
+      })
+    })
+
+    const existingImageUrls = (product.images || []).map((img: any) => img.url)
+    const imagesToAdd = newImageUrls.filter((url) => !existingImageUrls.includes(url))
+
+    if (imagesToAdd.length > 0) {
+      // Download and upload new images
+      const uploadedImages: { url: string }[] = [...(product.images || []).map((img: any) => ({ url: img.url }))]
+
+      for (const remoteUrl of imagesToAdd) {
+        const uploadedUrl = await downloadAndUploadImage(remoteUrl, scope, logger, imageCache)
+        if (uploadedUrl) {
+          uploadedImages.push({ url: uploadedUrl })
+        }
+      }
+
+      if (uploadedImages.length > existingImageUrls.length) {
+        productUpdates.images = uploadedImages
+        logger.debug(`[${parentSKU}]   Adding ${imagesToAdd.length} new images`)
+      }
+    }
+
+    // Update product if there are changes
+    if (Object.keys(productUpdates).length > 0) {
+      const { updateProductsWorkflow } = await import('@medusajs/medusa/core-flows')
+      await updateProductsWorkflow(scope).run({
+        input: {
+          selector: { id: productId },
+          update: productUpdates
+        }
+      })
+      logger.debug(`[${parentSKU}] ✓ Updated product with ${Object.keys(productUpdates).length} field(s)`)
+    } else {
+      logger.debug(`[${parentSKU}] No product-level changes detected`)
+    }
+
+    // Update variants
+    const existingVariants = product.variants || []
+    const existingVariantMap = new Map<string, any>()
+    existingVariants.forEach((v: any) => {
+      if (v.sku) {
+        existingVariantMap.set(v.sku, v)
+      }
+    })
+
+    for (const childRow of childRows) {
+      const sku = childRow[CSVColumn.SKU]
+      if (!sku) continue
+
+      const existingVariant = existingVariantMap.get(sku)
+      if (!existingVariant) {
+        logger.debug(`[${parentSKU}]   Variant ${sku} not found in product, skipping`)
+        continue
+      }
+
+      const variantUpdates: any = {}
+
+      // Check variant title
+      const newVariantTitle = childRow[CSVColumn.PRODUCT_NAME] || ''
+      if (newVariantTitle && newVariantTitle !== existingVariant.title) {
+        variantUpdates.title = newVariantTitle
+        logger.debug(`[${parentSKU}]   Variant ${sku} title changed`)
+      }
+
+      // Check price
+      const newPrice = extractPrice(childRow)
+      const existingPrice = existingVariant.prices?.[0]?.amount || 0
+      if (newPrice !== existingPrice) {
+        variantUpdates.prices = [{
+          amount: newPrice,
+          currency_code: 'gbp'
+        }]
+        logger.debug(`[${parentSKU}]   Variant ${sku} price changed: ${existingPrice} → ${newPrice}`)
+      }
+
+      // Check metadata
+      const newMetadata = extractVariantMetadata(childRow)
+      const existingMetadata = existingVariant.metadata || {}
+      let metadataChanged = false
+      for (const [key, value] of Object.entries(newMetadata)) {
+        if (existingMetadata[key] !== value) {
+          metadataChanged = true
+          break
+        }
+      }
+      if (metadataChanged) {
+        variantUpdates.metadata = { ...existingMetadata, ...newMetadata }
+        logger.debug(`[${parentSKU}]   Variant ${sku} metadata changed`)
+      }
+
+      // Update variant if there are changes
+      if (Object.keys(variantUpdates).length > 0) {
+        try {
+          const { updateProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+          await updateProductVariantsWorkflow(scope).run({
+            input: {
+              selector: { id: existingVariant.id },
+              update: variantUpdates
+            }
+          })
+          logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku}`)
+        } catch (variantError: any) {
+          logger.warn(`[${parentSKU}]   ⚠️  Failed to update variant ${sku}: ${variantError.message}`)
+        }
+      }
+
+      // Update inventory quantity
+      const newQuantity = extractQuantity(childRow)
+      try {
+        const existingItems = await inventoryModule.listInventoryItems({ sku })
+        if (existingItems && existingItems.length > 0) {
+          const inventoryItemId = existingItems[0].id
+          const existingLevels = await inventoryModule.listInventoryLevels({
+            inventory_item_id: inventoryItemId,
+            location_id: stockLocationId
+          })
+
+          if (existingLevels && existingLevels.length > 0) {
+            const existingLevel = existingLevels[0]
+            if (existingLevel.stocked_quantity !== newQuantity) {
+              await inventoryModule.updateInventoryLevels([{
+                id: existingLevel.id,
+                stocked_quantity: newQuantity
+              }])
+              logger.debug(`[${parentSKU}]   Variant ${sku} inventory changed: ${existingLevel.stocked_quantity} → ${newQuantity}`)
+            }
+          }
+        }
+      } catch (invError: any) {
+        logger.warn(`[${parentSKU}]   ⚠️  Failed to update inventory for ${sku}: ${invError.message}`)
+      }
+    }
+
+    logger.info(`[${parentSKU}] ✓ Successfully completed EDIT action for product ${productId}`)
+
+    return {
+      success: true,
+      productId,
+      action: ProductListingAction.EDIT
+    }
+  } catch (error: any) {
+    logger.error(`[${parentSKU}] ❌ Edit action failed: ${error.message}`)
+    return {
+      success: false,
+      error: `Edit failed: ${error.message}`,
+      action: ProductListingAction.EDIT
+    }
+  }
+}
+
+/**
  * Import a single parent group (product with variants)
  */
 export async function importParentGroup(
@@ -381,20 +863,47 @@ export async function importParentGroup(
   context: ImportContext,
   logger: Logger,
   scope: any
-): Promise<{
-  success: boolean
-  productId?: string
-  error?: string
-}> {
+): Promise<ImportResult> {
   const { parentRow, childRows, parentSKU } = group
   const { sellerId, stockLocationId, salesChannelId } = context
 
   logger.debug(`\n🔍 [DEBUG] Starting import of parent product: ${parentSKU}`)
 
+  // Detect action from parent row
+  const actionRaw = parentRow[CSVColumn.LISTING_ACTION] || ''
+  let action: ProductListingActionType = ProductListingAction.CREATE // default
+
+  if (isListingAction(actionRaw, ProductListingAction.IGNORE)) {
+    logger.debug(`[${parentSKU}] Action: IGNORE - skipping`)
+    return { success: true, productId: undefined, skipped: true, action: ProductListingAction.IGNORE }
+  }
+  if (isListingAction(actionRaw, ProductListingAction.DELETE)) {
+    action = ProductListingAction.DELETE
+  } else if (isListingAction(actionRaw, ProductListingAction.EDIT)) {
+    action = ProductListingAction.EDIT
+  }
+  // CREATE is default
+
+  logger.debug(`[${parentSKU}] Action detected: ${action}`)
+
   try {
     // 1. Get Product Module
     const productModule = scope.resolve(Modules.PRODUCT)
     logger.debug(`[${parentSKU}] ✓ Product module resolved`)
+
+    // Handle DELETE action
+    if (action === ProductListingAction.DELETE) {
+      return await handleDeleteAction(group, context, logger, scope)
+    }
+
+    // Handle EDIT action
+    if (action === ProductListingAction.EDIT) {
+      const imageCache = context.imageCache || new Map<string, string>()
+      return await handleEditAction(group, context, logger, scope, productModule, imageCache)
+    }
+
+    // From here on, we're handling CREATE action
+    // CREATE: Create product if it doesn't exist, skip if it already exists
 
     // 2. Determine product name and description
     // Product title comes from parent row (this is a parent product with multiple variants)
@@ -447,7 +956,8 @@ export async function importParentGroup(
       )
       return {
         success: false,
-        error: `No category mapping for product type: ${productType}`
+        error: `No category mapping for product type: ${productType}`,
+        action: ProductListingAction.CREATE
       }
     }
     logger.debug(
@@ -530,7 +1040,8 @@ export async function importParentGroup(
       )
       return {
         success: false,
-        error: `Category not found: ${categoryMapping.level3} or ${categoryMapping.level2}. Please run the seed script at /seed-ui to create missing categories.`
+        error: `Category not found: ${categoryMapping.level3} or ${categoryMapping.level2}. Please run the seed script at /seed-ui to create missing categories.`,
+        action: ProductListingAction.CREATE
       }
     }
 
@@ -871,7 +1382,8 @@ export async function importParentGroup(
       )
       return {
         success: false,
-        error: 'No variants to create'
+        error: 'No variants to create',
+        action: ProductListingAction.CREATE
       }
     }
 
@@ -1089,7 +1601,8 @@ export async function importParentGroup(
           )
           return {
             success: false,
-            error: `Product already exists with handle "${handle}", cannot add new variants via import`
+            error: `Product already exists with handle "${handle}", cannot add new variants via import`,
+            action: ProductListingAction.CREATE
           }
         }
       }
