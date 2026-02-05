@@ -629,7 +629,7 @@ async function handleEditAction(
       const { data } = await query.graph({
         entity: 'product',
         fields: [
-          'id', 'handle', 'title', 'description', 'status',
+          'id', 'handle', 'title', 'description', 'status', 'thumbnail', 'metadata',
           'images.id', 'images.url',
           'categories.id',
           'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
@@ -660,7 +660,7 @@ async function handleEditAction(
             const { data: productData } = await query.graph({
               entity: 'product',
               fields: [
-                'id', 'handle', 'title', 'description', 'status',
+                'id', 'handle', 'title', 'description', 'status', 'thumbnail', 'metadata',
                 'images.id', 'images.url',
                 'categories.id',
                 'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
@@ -711,6 +711,35 @@ async function handleEditAction(
       logger.debug(`[${parentSKU}]   Description changed`)
     }
 
+    // Check status
+    const statusValue = parentRow[CSVColumn.STATUS] || ''
+    if (statusValue.trim()) {
+      const newStatus = statusValue.toLowerCase() === 'active' ? 'published' : 'draft'
+      if (newStatus !== product.status) {
+        productUpdates.status = newStatus
+        logger.debug(`[${parentSKU}]   Status changed: "${product.status}" → "${newStatus}"`)
+      }
+    }
+
+    // Check metadata
+    const newMetadata = extractProductMetadata(parentRow, parentSKU, context.sellerId)
+    const existingMetadata = product.metadata || {}
+    let metadataChanged = false
+    for (const [key, value] of Object.entries(newMetadata)) {
+      // Skip imported_at as it changes every time
+      if (key === 'imported_at') continue
+      if (existingMetadata[key] !== value) {
+        metadataChanged = true
+        logger.debug(`[${parentSKU}]   Metadata.${key} changed`)
+        break
+      }
+    }
+    if (metadataChanged) {
+      // Merge new metadata into existing, preserving fields not in newMetadata
+      productUpdates.metadata = { ...existingMetadata, ...newMetadata }
+      logger.debug(`[${parentSKU}]   Product metadata will be updated`)
+    }
+
     // Check and update images
     const newImageUrls = extractImages(parentRow)
     childRowsToProcess.forEach((childRow) => {
@@ -725,6 +754,7 @@ async function handleEditAction(
     const existingImageUrls = (product.images || []).map((img: any) => img.url)
     const imagesToAdd = newImageUrls.filter((url) => !existingImageUrls.includes(url))
 
+    let newThumbnailUrl: string | null = null
     if (imagesToAdd.length > 0) {
       // Download and upload new images
       const uploadedImages: { url: string }[] = [...(product.images || []).map((img: any) => ({ url: img.url }))]
@@ -733,12 +763,25 @@ async function handleEditAction(
         const uploadedUrl = await downloadAndUploadImage(remoteUrl, scope, logger, imageCache)
         if (uploadedUrl) {
           uploadedImages.push({ url: uploadedUrl })
+          // Track first new uploaded image for thumbnail
+          if (!newThumbnailUrl) {
+            newThumbnailUrl = uploadedUrl
+          }
         }
       }
 
       if (uploadedImages.length > existingImageUrls.length) {
         productUpdates.images = uploadedImages
         logger.debug(`[${parentSKU}]   Adding ${imagesToAdd.length} new images`)
+      }
+    }
+
+    // Check thumbnail - set to first image if not already set
+    if (!product.thumbnail && (newThumbnailUrl || (product.images && product.images.length > 0))) {
+      const thumbnailUrl = newThumbnailUrl || product.images[0]?.url
+      if (thumbnailUrl) {
+        productUpdates.thumbnail = thumbnailUrl
+        logger.debug(`[${parentSKU}]   Setting thumbnail`)
       }
     }
 
@@ -784,14 +827,12 @@ async function handleEditAction(
         logger.debug(`[${parentSKU}]   Variant ${sku} title changed: "${existingVariant.title}" → "${newVariantTitle}"`)
       }
 
-      // Check price
+      // Check price - will be updated separately using upsertVariantPricesWorkflow
       const newPrice = extractPrice(childRow)
       const existingPrice = existingVariant.prices?.[0]?.amount || 0
-      if (newPrice !== existingPrice) {
-        variantUpdates.prices = [{
-          amount: newPrice,
-          currency_code: 'gbp'
-        }]
+      const priceChanged = newPrice !== existingPrice
+
+      if (priceChanged) {
         logger.debug(`[${parentSKU}]   Variant ${sku} price changed: ${existingPrice} → ${newPrice}`)
       }
 
@@ -838,7 +879,7 @@ async function handleEditAction(
         logger.debug(`[${parentSKU}]   Variant ${sku} metadata will be updated`)
       }
 
-      // Update variant if there are changes
+      // Update variant fields (title, metadata) if there are changes
       if (Object.keys(variantUpdates).length > 0) {
         try {
           const { updateProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
@@ -852,6 +893,29 @@ async function handleEditAction(
           logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku}`)
         } catch (variantError: any) {
           logger.warn(`[${parentSKU}]   ⚠️  Failed to update variant ${sku}: ${variantError.message}`)
+        }
+      }
+
+      // Update price using upsertVariantPricesWorkflow
+      if (priceChanged) {
+        try {
+          const { upsertVariantPricesWorkflow } = await import('@medusajs/medusa/core-flows')
+          await upsertVariantPricesWorkflow(scope).run({
+            input: {
+              variantPrices: [{
+                variant_id: existingVariant.id,
+                product_id: productId,
+                prices: [{
+                  amount: newPrice,
+                  currency_code: 'gbp'
+                }]
+              }],
+              previousVariantIds: []
+            }
+          })
+          logger.debug(`[${parentSKU}]   ✓ Updated variant ${sku} price`)
+        } catch (priceError: any) {
+          logger.warn(`[${parentSKU}]   ⚠️  Failed to update price for ${sku}: ${priceError.message}`)
         }
       }
 
