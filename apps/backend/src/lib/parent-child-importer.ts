@@ -599,10 +599,25 @@ async function handleEditAction(
 
   logger.debug(`[${parentSKU}] ✏️  Handling EDIT action`)
 
+  // Filter child rows by action
+  const childRowsToDelete = childRows.filter((row) =>
+    isListingAction(row[CSVColumn.LISTING_ACTION] || '', ProductListingAction.DELETE)
+  )
+  const childRowsToProcess = childRows.filter((row) =>
+    !isListingAction(row[CSVColumn.LISTING_ACTION] || '', ProductListingAction.DELETE) &&
+    !isListingAction(row[CSVColumn.LISTING_ACTION] || '', ProductListingAction.IGNORE)
+  )
+
   try {
     const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
     const query = scope.resolve(ContainerRegistrationKeys.QUERY)
     const inventoryModule = scope.resolve(Modules.INVENTORY)
+
+    // Handle child deletions first
+    if (childRowsToDelete.length > 0) {
+      const deleteResult = await handleChildDeletions(childRowsToDelete, parentSKU, context, logger, scope)
+      logger.debug(`[${parentSKU}] Child deletion result: ${deleteResult.deletedCount} deleted, ${deleteResult.errors.length} errors`)
+    }
 
     // Generate handle to find product
     const productTitle = parentRow[CSVColumn.PRODUCT_NAME] || `Product ${parentSKU}`
@@ -687,9 +702,9 @@ async function handleEditAction(
 
     // Check description
     let newDescription = parentRow[CSVColumn.PRODUCT_DESCRIPTION] || ''
-    if (!newDescription.trim() && childRows.length > 0) {
+    if (!newDescription.trim() && childRowsToProcess.length > 0) {
       // Try to get from first child row
-      newDescription = childRows[0][CSVColumn.PRODUCT_DESCRIPTION] || ''
+      newDescription = childRowsToProcess[0][CSVColumn.PRODUCT_DESCRIPTION] || ''
     }
     if (newDescription && newDescription.trim() !== '' && newDescription !== product.description) {
       productUpdates.description = newDescription
@@ -698,7 +713,7 @@ async function handleEditAction(
 
     // Check and update images
     const newImageUrls = extractImages(parentRow)
-    childRows.forEach((childRow) => {
+    childRowsToProcess.forEach((childRow) => {
       const childImages = extractImages(childRow)
       childImages.forEach((url) => {
         if (!newImageUrls.includes(url)) {
@@ -750,7 +765,7 @@ async function handleEditAction(
       }
     })
 
-    for (const childRow of childRows) {
+    for (const childRow of childRowsToProcess) {
       const sku = childRow[CSVColumn.SKU]
       if (!sku) continue
 
@@ -799,9 +814,10 @@ async function handleEditAction(
       if (Object.keys(variantUpdates).length > 0) {
         try {
           const { updateProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
-          await updateProductVariantsWorkflow(scope).run({
+          await updateProductVariantsWorkflow.run({
+            container: scope,
             input: {
-              selector: { id: existingVariant.id },
+              selector: { id: existingVariant.id, product_id: productId },
               update: variantUpdates
             }
           })
@@ -856,6 +872,140 @@ async function handleEditAction(
 }
 
 /**
+ * Handle deletion of individual child variants that have DELETE action
+ * This is called when parent has CREATE/EDIT but some children have DELETE
+ */
+async function handleChildDeletions(
+  childRowsToDelete: CSVRow[],
+  parentSKU: string,
+  context: ImportContext,
+  logger: Logger,
+  scope: any
+): Promise<{ deletedCount: number; errors: string[] }> {
+  const { sellerId } = context
+  const errors: string[] = []
+  let deletedCount = 0
+
+  if (childRowsToDelete.length === 0) {
+    return { deletedCount: 0, errors: [] }
+  }
+
+  logger.debug(`[${parentSKU}] 🗑️  Processing ${childRowsToDelete.length} child variants for deletion`)
+
+  try {
+    const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+    const query = scope.resolve(ContainerRegistrationKeys.QUERY)
+    const inventoryModule = scope.resolve(Modules.INVENTORY)
+    const remoteLink = scope.resolve('remoteLink')
+    const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
+
+    // Collect SKUs to delete
+    const skusToDelete = childRowsToDelete
+      .map((row) => row[CSVColumn.SKU])
+      .filter((sku) => sku && sku.trim() !== '')
+
+    if (skusToDelete.length === 0) {
+      logger.debug(`[${parentSKU}] No valid SKUs found for deletion`)
+      return { deletedCount: 0, errors: [] }
+    }
+
+    // Find existing variants by SKU
+    const { data: existingVariants } = await query.graph({
+      entity: 'product_variant',
+      fields: ['id', 'sku', 'product_id'],
+      filters: { sku: skusToDelete }
+    })
+
+    if (!existingVariants || existingVariants.length === 0) {
+      logger.debug(`[${parentSKU}] No existing variants found for SKUs: ${skusToDelete.join(', ')}`)
+      return { deletedCount: 0, errors: [] }
+    }
+
+    const variantIdsToDelete: string[] = []
+
+    // Delete inventory for each variant first
+    for (const variant of existingVariants) {
+      try {
+        // Find linked inventory item
+        const existingItems = await inventoryModule.listInventoryItems({
+          sku: variant.sku
+        })
+
+        if (existingItems && existingItems.length > 0) {
+          const inventoryItemId = existingItems[0].id
+
+          // 1. Delete inventory levels at all locations
+          const levels = await inventoryModule.listInventoryLevels({
+            inventory_item_id: inventoryItemId
+          })
+
+          if (levels && levels.length > 0) {
+            const levelIds = levels.map((l: any) => l.id)
+            await inventoryModule.deleteInventoryLevels(levelIds)
+            logger.debug(`[${parentSKU}]   Deleted ${levelIds.length} inventory levels for variant ${variant.sku}`)
+          }
+
+          // 2. Remove variant ↔ inventory link
+          try {
+            await remoteLink.dismiss({
+              [Modules.PRODUCT]: {
+                variant_id: variant.id
+              },
+              [Modules.INVENTORY]: {
+                inventory_item_id: inventoryItemId
+              }
+            })
+          } catch (linkError: any) {
+            logger.debug(`[${parentSKU}]   Could not remove variant-inventory link: ${linkError.message}`)
+          }
+
+          // 3. Remove seller ↔ inventory link
+          try {
+            await knex('seller_seller_inventory_inventory_item')
+              .where({
+                seller_id: sellerId,
+                inventory_item_id: inventoryItemId
+              })
+              .del()
+          } catch (linkError: any) {
+            logger.debug(`[${parentSKU}]   Could not remove seller-inventory link: ${linkError.message}`)
+          }
+
+          // 4. Delete inventory item
+          await inventoryModule.deleteInventoryItems([inventoryItemId])
+          logger.debug(`[${parentSKU}]   Deleted inventory item for variant ${variant.sku}`)
+        }
+
+        variantIdsToDelete.push(variant.id)
+      } catch (invError: any) {
+        const errorMsg = `Failed to delete inventory for variant ${variant.sku}: ${invError.message}`
+        logger.warn(`[${parentSKU}]   ⚠️  ${errorMsg}`)
+        errors.push(errorMsg)
+        // Continue with variant deletion anyway
+        variantIdsToDelete.push(variant.id)
+      }
+    }
+
+    // Delete the variants using the workflow
+    if (variantIdsToDelete.length > 0) {
+      const { deleteProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+      await deleteProductVariantsWorkflow(scope).run({
+        input: { ids: variantIdsToDelete }
+      })
+      deletedCount = variantIdsToDelete.length
+      logger.info(`[${parentSKU}] ✓ Deleted ${deletedCount} variants: ${existingVariants.map((v: any) => v.sku).join(', ')}`)
+    }
+
+  } catch (error: any) {
+    const errorMsg = `Failed to delete child variants: ${error.message}`
+    logger.error(`[${parentSKU}] ❌ ${errorMsg}`)
+    errors.push(errorMsg)
+  }
+
+  return { deletedCount, errors }
+}
+
+/**
  * Import a single parent group (product with variants)
  */
 export async function importParentGroup(
@@ -891,7 +1041,7 @@ export async function importParentGroup(
     const productModule = scope.resolve(Modules.PRODUCT)
     logger.debug(`[${parentSKU}] ✓ Product module resolved`)
 
-    // Handle DELETE action
+    // Handle DELETE action (for entire product)
     if (action === ProductListingAction.DELETE) {
       return await handleDeleteAction(group, context, logger, scope)
     }
@@ -904,6 +1054,48 @@ export async function importParentGroup(
 
     // From here on, we're handling CREATE action
     // CREATE: Create product if it doesn't exist, skip if it already exists
+
+    // 2a. Check for child rows that have DELETE action (delete individual variants)
+    logger.debug(`[${parentSKU}] 📊 CHILD ROW ANALYSIS:`)
+    logger.debug(`[${parentSKU}]   Total childRows from group: ${childRows.length}`)
+    childRows.forEach((row, idx) => {
+      const sku = row[CSVColumn.SKU] || 'NO_SKU'
+      const action = row[CSVColumn.LISTING_ACTION] || 'NO_ACTION'
+      logger.debug(`[${parentSKU}]   Child ${idx}: SKU="${sku}", Action="${action}"`)
+    })
+
+    const childRowsToDelete = childRows.filter((row) =>
+      isListingAction(row[CSVColumn.LISTING_ACTION] || '', ProductListingAction.DELETE)
+    )
+    const childRowsToProcess = childRows.filter((row) =>
+      !isListingAction(row[CSVColumn.LISTING_ACTION] || '', ProductListingAction.DELETE) &&
+      !isListingAction(row[CSVColumn.LISTING_ACTION] || '', ProductListingAction.IGNORE)
+    )
+
+    logger.debug(`[${parentSKU}]   childRowsToDelete: ${childRowsToDelete.length}`)
+    logger.debug(`[${parentSKU}]   childRowsToProcess: ${childRowsToProcess.length}`)
+    childRowsToProcess.forEach((row, idx) => {
+      logger.debug(`[${parentSKU}]   ToProcess ${idx}: SKU="${row[CSVColumn.SKU]}"`)
+    })
+
+    // Handle child deletions if any
+    if (childRowsToDelete.length > 0) {
+      const deleteResult = await handleChildDeletions(childRowsToDelete, parentSKU, context, logger, scope)
+      logger.debug(`[${parentSKU}] Child deletion result: ${deleteResult.deletedCount} deleted, ${deleteResult.errors.length} errors`)
+    }
+
+    // If no children left to process, we're done (all were deleted or ignored)
+    if (childRowsToProcess.length === 0 && childRowsToDelete.length > 0) {
+      logger.debug(`[${parentSKU}] All children were deleted or ignored, no new variants to create`)
+      return {
+        success: true,
+        skipped: true,
+        action: ProductListingAction.CREATE
+      }
+    }
+
+    // Use filtered child rows for the rest of the processing
+    const activeChildRows = childRowsToProcess
 
     // 2. Determine product name and description
     // Product title comes from parent row (this is a parent product with multiple variants)
@@ -1072,13 +1264,13 @@ export async function importParentGroup(
     const allImageUrls = new Set<string>(parentImageUrls)
 
     // Also collect images from each child row (variant-specific images)
-    childRows.forEach((childRow) => {
+    activeChildRows.forEach((childRow) => {
       const childImages = extractImages(childRow)
       childImages.forEach((url) => allImageUrls.add(url))
     })
 
     logger.debug(
-      `[${parentSKU}] Collected ${allImageUrls.size} unique remote image URLs from parent and ${childRows.length} child rows`
+      `[${parentSKU}] Collected ${allImageUrls.size} unique remote image URLs from parent and ${activeChildRows.length} child rows`
     )
     if (allImageUrls.size > 0) {
       logger.debug(
@@ -1152,7 +1344,7 @@ export async function importParentGroup(
       `[${parentSKU}] Variant columns to check: ${variantColumns.join(', ')}`
     )
     logger.debug(
-      `[${parentSKU}] Found ${childRows.length} child rows (variants)`
+      `[${parentSKU}] Found ${activeChildRows.length} child rows (variants)`
     )
 
     // 7. Detect which variant attribute columns have values in child rows
@@ -1165,7 +1357,7 @@ export async function importParentGroup(
     }
 
     // Collect unique values from child rows for each variant column
-    childRows.forEach((row) => {
+    activeChildRows.forEach((row) => {
       for (const column of variantColumns) {
         const value = (row[column] || '').trim()
         if (value) {
@@ -1232,7 +1424,7 @@ export async function importParentGroup(
 
     // 8. Create variants from child rows
     // Only include child rows that have values for ALL active attributes
-    const validChildRows = childRows.filter((childRow) => {
+    const validChildRows = activeChildRows.filter((childRow) => {
       // Check if this row has values for all active attributes
       for (const column of activeAttributes) {
         const value = (childRow[column] || '').trim()
@@ -1246,9 +1438,9 @@ export async function importParentGroup(
       return true
     })
 
-    if (validChildRows.length < childRows.length) {
+    if (validChildRows.length < activeChildRows.length) {
       logger.warn(
-        `[${parentSKU}] ⚠️  Filtered out ${childRows.length - validChildRows.length} variants with missing attribute values`
+        `[${parentSKU}] ⚠️  Filtered out ${activeChildRows.length - validChildRows.length} variants with missing attribute values`
       )
     }
 
@@ -1378,7 +1570,7 @@ export async function importParentGroup(
 
     if (variants.length === 0) {
       logger.error(
-        `[${parentSKU}] ❌ No variants created from ${childRows.length} child rows`
+        `[${parentSKU}] ❌ No variants created from ${activeChildRows.length} child rows`
       )
       return {
         success: false,
@@ -1387,10 +1579,13 @@ export async function importParentGroup(
       }
     }
 
-    logger.debug(`[${parentSKU}] ✓ Created ${variants.length} variants`)
-    logger.debug(
-      `[${parentSKU}] Sample variant: SKU=${variants[0].sku}, Price=${variants[0].prices[0]?.amount}, Options=${JSON.stringify(variants[0].options)}`
-    )
+    logger.debug(`[${parentSKU}] 📊 VARIANT PREPARATION:`)
+    logger.debug(`[${parentSKU}]   activeChildRows count: ${activeChildRows.length}`)
+    logger.debug(`[${parentSKU}]   validChildRows count: ${validChildRows.length}`)
+    logger.debug(`[${parentSKU}]   variants array count: ${variants.length}`)
+    variants.forEach((v, idx) => {
+      logger.debug(`[${parentSKU}]   Variant ${idx}: SKU="${v.sku}", Title="${v.title?.substring(0, 50)}"`)
+    })
 
     // 7. Generate readable handle from product title
     const generateHandle = (title: string, sku: string): string => {
@@ -1493,6 +1688,11 @@ export async function importParentGroup(
     let product: any
     let productId: string | undefined
 
+    logger.debug(`[${parentSKU}] 📊 EXISTING CHECK:`)
+    logger.debug(`[${parentSKU}]   existingProduct: ${existingProduct ? existingProduct.id : 'null'}`)
+    logger.debug(`[${parentSKU}]   existingSkus: ${existingSkus.size} → [${Array.from(existingSkus).join(', ')}]`)
+    logger.debug(`[${parentSKU}]   variants to potentially create: ${variants.length}`)
+
     if (existingProduct) {
       // Product already exists, use it
       product = existingProduct
@@ -1578,11 +1778,61 @@ export async function importParentGroup(
       }
 
       // Filter out existing variants
-      if (existingSkus.size > 0) {
+      logger.debug(`[${parentSKU}] 📊 VARIANT FILTERING (product exists):`)
+      logger.debug(`[${parentSKU}]   variants before filter: ${variants.length}`)
+      logger.debug(`[${parentSKU}]   existingSkus to filter out: ${existingSkus.size}`)
+
+      if (existingSkus.size === 0 && variants.length > 0) {
+        // Product exists but no variant SKUs match - all variants are new
+        logger.debug(`[${parentSKU}] ℹ️  Product exists but all ${variants.length} variants are new`)
+
+        try {
+          const { batchProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+
+          const variantsToCreate = variants.map((v) => ({
+            ...v,
+            product_id: productId
+          }))
+
+          logger.debug(`[${parentSKU}] 🚀 Calling batchProductVariantsWorkflow with ${variantsToCreate.length} new variants`)
+          variantsToCreate.forEach((v, idx) => {
+            logger.debug(`[${parentSKU}]   ToCreate ${idx}: SKU="${v.sku}", product_id="${v.product_id}"`)
+          })
+
+          await batchProductVariantsWorkflow(scope).run({
+            input: {
+              create: variantsToCreate,
+              update: [],
+              delete: []
+            }
+          })
+
+          logger.debug(`[${parentSKU}] ✓ Created ${variants.length} new variants for existing product`)
+
+          // Reload product with new variants
+          const { data: reloadedProduct } = await query.graph({
+            entity: 'product',
+            fields: ['id', 'handle', 'title', 'variants.id', 'variants.sku'],
+            filters: { id: productId }
+          })
+          if (reloadedProduct && reloadedProduct.length > 0) {
+            product = reloadedProduct[0]
+          }
+        } catch (batchError: any) {
+          logger.error(`[${parentSKU}] ❌ Failed to create new variants: ${batchError.message}`)
+          return {
+            success: false,
+            error: `Failed to add new variants to existing product: ${batchError.message}`,
+            action: ProductListingAction.CREATE
+          }
+        }
+      } else if (existingSkus.size > 0) {
         logger.debug(
           `[${parentSKU}] ⚠️  Found ${existingSkus.size} existing variants with SKUs: ${Array.from(existingSkus).join(', ')}`
         )
+        const beforeFilterCount = variants.length
         variants = variants.filter((v) => !existingSkus.has(v.sku))
+        logger.debug(`[${parentSKU}]   variants after filter: ${variants.length} (removed ${beforeFilterCount - variants.length})`)
 
         if (variants.length === 0) {
           logger.debug(
@@ -1595,14 +1845,58 @@ export async function importParentGroup(
           logger.debug(
             `[${parentSKU}] ℹ️  ${variants.length} new variants to add (${existingSkus.size} already exist)`
           )
-          // We can't add variants to existing product via this workflow, so skip
-          logger.debug(
-            `[${parentSKU}] ⚠️  Cannot add variants to existing product via import, skipping`
-          )
-          return {
-            success: false,
-            error: `Product already exists with handle "${handle}", cannot add new variants via import`,
-            action: ProductListingAction.CREATE
+          variants.forEach((v, idx) => {
+            logger.debug(`[${parentSKU}]   New variant ${idx}: SKU="${v.sku}"`)
+          })
+
+          // Add new variants to existing product using batchProductVariantsWorkflow
+          product = existingProduct
+          productId = product.id
+
+          try {
+            const { batchProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+
+            // Prepare variants for batch creation - need to include product_id
+            const variantsToCreate = variants.map((v) => ({
+              ...v,
+              product_id: productId
+            }))
+
+            logger.debug(`[${parentSKU}] 🚀 Calling batchProductVariantsWorkflow with ${variantsToCreate.length} variants`)
+            variantsToCreate.forEach((v, idx) => {
+              logger.debug(`[${parentSKU}]   ToCreate ${idx}: SKU="${v.sku}", product_id="${v.product_id}"`)
+            })
+
+            await batchProductVariantsWorkflow(scope).run({
+              input: {
+                create: variantsToCreate,
+                update: [],
+                delete: []
+              }
+            })
+
+            logger.debug(
+              `[${parentSKU}] ✓ Created ${variants.length} new variants for existing product`
+            )
+
+            // Reload product with new variants
+            const { data: reloadedProduct } = await query.graph({
+              entity: 'product',
+              fields: ['id', 'handle', 'title', 'variants.id', 'variants.sku'],
+              filters: { id: productId }
+            })
+            if (reloadedProduct && reloadedProduct.length > 0) {
+              product = reloadedProduct[0]
+            }
+          } catch (batchError: any) {
+            logger.error(
+              `[${parentSKU}] ❌ Failed to create new variants: ${batchError.message}`
+            )
+            return {
+              success: false,
+              error: `Failed to add new variants to existing product: ${batchError.message}`,
+              action: ProductListingAction.CREATE
+            }
           }
         }
       }
@@ -1693,9 +1987,42 @@ export async function importParentGroup(
                 }
               }
 
-              // All variants exist, product is complete
-              variants = []
-              // Load product with variants for inventory processing
+              // Filter out existing variants and create new ones if any
+              variants = variants.filter((v) => !existingSkus.has(v.sku))
+
+              if (variants.length > 0) {
+                // Add new variants to existing product
+                logger.debug(
+                  `[${parentSKU}] ℹ️  ${variants.length} new variants to add to existing product`
+                )
+                try {
+                  const { batchProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+
+                  const variantsToCreate = variants.map((v) => ({
+                    ...v,
+                    product_id: productId
+                  }))
+
+                  await batchProductVariantsWorkflow(scope).run({
+                    input: {
+                      create: variantsToCreate,
+                      update: [],
+                      delete: []
+                    }
+                  })
+
+                  logger.debug(
+                    `[${parentSKU}] ✓ Created ${variants.length} new variants for existing product`
+                  )
+                } catch (batchError: any) {
+                  logger.error(
+                    `[${parentSKU}] ❌ Failed to create new variants: ${batchError.message}`
+                  )
+                  // Continue - we'll still try to handle inventory for existing variants
+                }
+              }
+
+              // Load product with all variants (including newly created) for inventory processing
               const { data: fullProduct } = await query.graph({
                 entity: 'product',
                 fields: ['id', 'variants.id', 'variants.sku'],
@@ -1918,7 +2245,7 @@ export async function importParentGroup(
 
     // Create a map of SKU to childRow for efficient lookup
     const childRowMap = new Map<string, CSVRow>()
-    childRows.forEach((row) => {
+    activeChildRows.forEach((row) => {
       const sku = row[CSVColumn.SKU]
       if (sku) {
         childRowMap.set(sku, row)
