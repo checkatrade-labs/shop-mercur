@@ -779,6 +779,165 @@ async function handleEditAction(
       }
     })
 
+    // Check if any child SKUs belong to a DIFFERENT product and need reparenting
+    const childSkus = childRowsToProcess.map(r => r[CSVColumn.SKU]).filter(Boolean) as string[]
+    const skusNotOnThisProduct = childSkus.filter(sku => !existingVariantMap.has(sku))
+
+    if (skusNotOnThisProduct.length > 0) {
+      try {
+        const { data: foreignVariants } = await query.graph({
+          entity: 'product_variant',
+          fields: ['id', 'sku', 'product_id'],
+          filters: { sku: skusNotOnThisProduct }
+        })
+
+        if (foreignVariants && foreignVariants.length > 0) {
+          const variantsToReparent = foreignVariants
+            .filter((v: any) => v.product_id !== productId)
+            .map((v: any) => ({ variantId: v.id, sku: v.sku, oldProductId: v.product_id }))
+
+          if (variantsToReparent.length > 0) {
+            logger.info(`[${parentSKU}] Detected ${variantsToReparent.length} variants that need reparenting (EDIT flow)`)
+            variantsToReparent.forEach((v: any) => {
+              logger.debug(`[${parentSKU}]   - ${v.sku}: moving from product ${v.oldProductId}`)
+            })
+
+            const reparentResult = await handleVariantReparenting(variantsToReparent, parentSKU, context, logger, scope)
+            logger.info(`[${parentSKU}] Reparenting complete: ${reparentResult.movedCount} moved, ${reparentResult.errors.length} errors`)
+
+            // Reparented variants need to be recreated under this product
+            // Collect the child rows for successfully reparented SKUs
+            const reparentedSkus = new Set(
+              variantsToReparent
+                .filter((v: any) => !reparentResult.errors.some(e => e.includes(v.sku)))
+                .map((v: any) => v.sku)
+            )
+
+            if (reparentedSkus.size > 0) {
+              // Build variant data from child rows for the reparented SKUs
+              const childRowsForReparented = childRowsToProcess.filter(r => reparentedSkus.has(r[CSVColumn.SKU] || ''))
+
+              if (childRowsForReparented.length > 0) {
+                try {
+                  // Determine variation theme from parent row
+                  const variationTheme = parentRow[CSVColumn.VARIATION_THEME_NAME] || ''
+                  const optionNames = variationTheme
+                    .split(/[,;]+/)
+                    .map((s: string) => s.trim())
+                    .filter(Boolean)
+
+                  const newVariants = childRowsForReparented.map(childRow => {
+                    const sku = childRow[CSVColumn.SKU] || ''
+                    const title = childRow[CSVColumn.PRODUCT_NAME] || sku
+                    const price = extractPrice(childRow)
+                    const metadata = extractVariantMetadata(childRow)
+
+                    // Build options from the variation theme columns
+                    const options: Record<string, string> = {}
+                    for (const optName of optionNames) {
+                      const value = childRow[optName] || ''
+                      if (value.trim()) {
+                        options[optName] = value.trim()
+                      }
+                    }
+
+                    return {
+                      title,
+                      sku,
+                      options,
+                      prices: [{ amount: price, currency_code: 'gbp' }],
+                      metadata,
+                      manage_inventory: true,
+                      product_id: productId
+                    }
+                  })
+
+                  // Ensure product options include all needed values before adding variants
+                  await ensureProductOptionValues(productId, newVariants, parentSKU, logger, scope)
+
+                  const { batchProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+                  await batchProductVariantsWorkflow(scope).run({
+                    input: {
+                      create: newVariants,
+                      update: [],
+                      delete: []
+                    }
+                  })
+
+                  logger.info(`[${parentSKU}] Created ${newVariants.length} reparented variants under this product`)
+
+                  // Reload product variants so inventory setup works below
+                  const { data: reloadedProduct } = await query.graph({
+                    entity: 'product',
+                    fields: [
+                      'id', 'handle', 'title', 'description', 'status', 'thumbnail', 'metadata',
+                      'images.id', 'images.url',
+                      'categories.id',
+                      'variants.id', 'variants.sku', 'variants.title', 'variants.metadata',
+                      'variants.prices.id', 'variants.prices.amount', 'variants.prices.currency_code',
+                      'variants.options.id', 'variants.options.value', 'variants.options.option.title'
+                    ],
+                    filters: { id: productId }
+                  })
+
+                  if (reloadedProduct && reloadedProduct.length > 0) {
+                    // Update existing variant map with newly created variants
+                    const reloadedVariants = reloadedProduct[0].variants || []
+                    reloadedVariants.forEach((v: any) => {
+                      if (v.sku && !existingVariantMap.has(v.sku)) {
+                        existingVariantMap.set(v.sku, v)
+                      }
+                    })
+                  }
+
+                  // Set up inventory for reparented variants
+                  for (const childRow of childRowsForReparented) {
+                    const sku = childRow[CSVColumn.SKU] || ''
+                    const quantity = extractQuantity(childRow)
+                    const newVariant = existingVariantMap.get(sku)
+                    if (!newVariant) continue
+
+                    try {
+                      const existingItems = await inventoryModule.listInventoryItems({ sku })
+                      if (!existingItems || existingItems.length === 0) {
+                        const inventoryItem = await inventoryModule.createInventoryItems({ sku })
+                        await inventoryModule.createInventoryLevels([{
+                          inventory_item_id: inventoryItem.id,
+                          location_id: stockLocationId,
+                          stocked_quantity: quantity
+                        }])
+
+                        const remoteLink = scope.resolve('remoteLink')
+                        await remoteLink.create({
+                          [Modules.PRODUCT]: { variant_id: newVariant.id },
+                          [Modules.INVENTORY]: { inventory_item_id: inventoryItem.id }
+                        })
+
+                        const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+                        const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
+                        await knex('seller_seller_inventory_inventory_item').insert({
+                          seller_id: context.sellerId,
+                          inventory_item_id: inventoryItem.id
+                        })
+
+                        logger.debug(`[${parentSKU}]   Set up inventory for reparented variant ${sku} (qty: ${quantity})`)
+                      }
+                    } catch (invError: any) {
+                      logger.warn(`[${parentSKU}]   Failed to set up inventory for reparented variant ${sku}: ${invError.message}`)
+                    }
+                  }
+                } catch (createError: any) {
+                  logger.error(`[${parentSKU}] Failed to create reparented variants: ${createError.message}`)
+                }
+              }
+            }
+          }
+        }
+      } catch (queryError: any) {
+        logger.warn(`[${parentSKU}] Could not check for foreign variants: ${queryError.message}`)
+      }
+    }
+
     let variantsUpdated = 0
     let pricesUpdated = 0
     let inventoryUpdated = 0
@@ -858,6 +1017,7 @@ async function handleEditAction(
           })
           variantsUpdated++
         } catch (variantError: any) {
+          logger.warn(`[${parentSKU}] ⚠️ Failed to update variant for ${sku}: ${variantError.message}`)
           variantErrors++
         }
       }
@@ -1074,6 +1234,199 @@ async function handleChildDeletions(
   }
 
   return { deletedCount, errors }
+}
+
+/**
+ * Ensure that a product's options include all values needed by the given variants.
+ * Queries the product's existing options, compares with the variants' option values,
+ * and updates any options that are missing values.
+ */
+async function ensureProductOptionValues(
+  productId: string,
+  variants: Array<{ options?: Record<string, string> }>,
+  parentSKU: string,
+  logger: Logger,
+  scope: any
+): Promise<void> {
+  if (variants.length === 0) return
+
+  const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+  const query = scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  // Query existing product options with their values
+  const { data: productData } = await query.graph({
+    entity: 'product',
+    fields: ['id', 'options.id', 'options.title', 'options.values.id', 'options.values.value'],
+    filters: { id: productId }
+  })
+
+  if (!productData || productData.length === 0) return
+
+  const existingOptions = productData[0].options || []
+
+  // Build a map of option title -> { optionId, existing values }
+  const optionMap = new Map<string, { id: string; values: Set<string> }>()
+  for (const opt of existingOptions) {
+    const existingValues = new Set<string>((opt.values || []).map((v: any) => v.value))
+    optionMap.set(opt.title, { id: opt.id, values: existingValues })
+  }
+
+  // Collect all needed option values from the variants
+  const neededValues = new Map<string, Set<string>>()
+  for (const variant of variants) {
+    if (!variant.options) continue
+    for (const [optTitle, optValue] of Object.entries(variant.options)) {
+      if (!optValue) continue
+      if (!neededValues.has(optTitle)) {
+        neededValues.set(optTitle, new Set())
+      }
+      neededValues.get(optTitle)!.add(optValue)
+    }
+  }
+
+  // For each option, check if we need to add new values
+  const { updateProductOptionsWorkflow } = await import('@medusajs/medusa/core-flows')
+
+  for (const [optTitle, needed] of Array.from(neededValues.entries())) {
+    const existing = optionMap.get(optTitle)
+    if (!existing) {
+      // Option doesn't exist on this product at all - create it
+      try {
+        const { createProductOptionsWorkflow } = await import('@medusajs/medusa/core-flows')
+        await createProductOptionsWorkflow(scope).run({
+          input: {
+            product_options: [{
+              title: optTitle,
+              values: Array.from(needed),
+              product_id: productId
+            }]
+          }
+        })
+        logger.debug(`[${parentSKU}] Created new product option "${optTitle}" with values: ${Array.from(needed).join(', ')}`)
+      } catch (createError: any) {
+        logger.warn(`[${parentSKU}] Failed to create option "${optTitle}": ${createError.message}`)
+      }
+      continue
+    }
+
+    const missingValues = Array.from(needed).filter(v => !existing.values.has(v))
+    if (missingValues.length === 0) continue
+
+    // Merge existing + missing values
+    const allValues = Array.from(new Set([...existing.values, ...missingValues]))
+    try {
+      await updateProductOptionsWorkflow(scope).run({
+        input: {
+          selector: { id: existing.id },
+          update: { values: allValues }
+        }
+      })
+      logger.debug(`[${parentSKU}] Updated option "${optTitle}" with new values: ${missingValues.join(', ')}`)
+    } catch (updateError: any) {
+      logger.warn(`[${parentSKU}] Failed to update option "${optTitle}": ${updateError.message}`)
+    }
+  }
+}
+
+/**
+ * Handle reparenting of variants that belong to a different product than the target.
+ * Deletes the variant (and its inventory) from the old product so it can be recreated under the new one.
+ * Follows the same deletion pattern as handleChildDeletions.
+ */
+async function handleVariantReparenting(
+  variantsToMove: Array<{ variantId: string; sku: string; oldProductId: string }>,
+  parentSKU: string,
+  context: ImportContext,
+  logger: Logger,
+  scope: any
+): Promise<{ movedCount: number; errors: string[] }> {
+  const { sellerId } = context
+  const errors: string[] = []
+  let movedCount = 0
+
+  if (variantsToMove.length === 0) {
+    return { movedCount: 0, errors: [] }
+  }
+
+  try {
+    const { ContainerRegistrationKeys } = await import('@medusajs/framework/utils')
+    const inventoryModule = scope.resolve(Modules.INVENTORY)
+    const remoteLink = scope.resolve('remoteLink')
+    const knex = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION)
+
+    for (const variant of variantsToMove) {
+      try {
+        // 1. Find and delete inventory for the variant
+        const existingItems = await inventoryModule.listInventoryItems({
+          sku: variant.sku
+        })
+
+        if (existingItems && existingItems.length > 0) {
+          const inventoryItemId = existingItems[0].id
+
+          // Delete inventory levels at all locations
+          const levels = await inventoryModule.listInventoryLevels({
+            inventory_item_id: inventoryItemId
+          })
+
+          if (levels && levels.length > 0) {
+            const levelIds = levels.map((l: any) => l.id)
+            await inventoryModule.deleteInventoryLevels(levelIds)
+            logger.debug(`[${parentSKU}]   Deleted ${levelIds.length} inventory levels for reparented variant ${variant.sku}`)
+          }
+
+          // 2. Remove variant <-> inventory link
+          try {
+            await remoteLink.dismiss({
+              [Modules.PRODUCT]: {
+                variant_id: variant.variantId
+              },
+              [Modules.INVENTORY]: {
+                inventory_item_id: inventoryItemId
+              }
+            })
+          } catch (linkError: any) {
+            logger.debug(`[${parentSKU}]   Could not remove variant-inventory link for ${variant.sku}: ${linkError.message}`)
+          }
+
+          // 3. Remove seller <-> inventory link
+          try {
+            await knex('seller_seller_inventory_inventory_item')
+              .where({
+                seller_id: sellerId,
+                inventory_item_id: inventoryItemId
+              })
+              .del()
+          } catch (linkError: any) {
+            logger.debug(`[${parentSKU}]   Could not remove seller-inventory link for ${variant.sku}: ${linkError.message}`)
+          }
+
+          // 4. Delete inventory item
+          await inventoryModule.deleteInventoryItems([inventoryItemId])
+          logger.debug(`[${parentSKU}]   Deleted inventory item for reparented variant ${variant.sku}`)
+        }
+
+        // 5. Delete the variant from the old product
+        const { deleteProductVariantsWorkflow } = await import('@medusajs/medusa/core-flows')
+        await deleteProductVariantsWorkflow(scope).run({
+          input: { ids: [variant.variantId] }
+        })
+
+        movedCount++
+        logger.debug(`[${parentSKU}]   Removed variant ${variant.sku} from old product ${variant.oldProductId}`)
+      } catch (variantError: any) {
+        const errorMsg = `Failed to reparent variant ${variant.sku}: ${variantError.message}`
+        logger.warn(`[${parentSKU}]   ${errorMsg}`)
+        errors.push(errorMsg)
+      }
+    }
+  } catch (error: any) {
+    const errorMsg = `Failed to reparent variants: ${error.message}`
+    logger.error(`[${parentSKU}] ${errorMsg}`)
+    errors.push(errorMsg)
+  }
+
+  return { movedCount, errors }
 }
 
 /**
@@ -1734,6 +2087,7 @@ export async function importParentGroup(
     // Check for existing variants by SKU
     const variantSkus = variants.map((v) => v.sku)
     const existingSkus = new Set<string>()
+    const existingVariantInfo = new Map<string, { variantId: string; productId: string }>()
 
     if (variantSkus.length > 0) {
       try {
@@ -1746,6 +2100,7 @@ export async function importParentGroup(
           variantData.forEach((v: any) => {
             if (variantSkus.includes(v.sku)) {
               existingSkus.add(v.sku)
+              existingVariantInfo.set(v.sku, { variantId: v.id, productId: v.product_id })
             }
           })
         }
@@ -1754,6 +2109,41 @@ export async function importParentGroup(
           `[${parentSKU}] ⚠️  Could not find existing variants: ${error.message}`
         )
       }
+    }
+
+    // Determine which existing variants belong to a DIFFERENT product and need reparenting
+    const targetProductId = existingProduct?.id || null
+    const variantsNeedingReparent: Array<{ variantId: string; sku: string; oldProductId: string }> = []
+
+    for (const [sku, info] of Array.from(existingVariantInfo.entries())) {
+      if (targetProductId) {
+        // Product exists by handle - variants on a different product need moving
+        if (info.productId !== targetProductId) {
+          variantsNeedingReparent.push({ variantId: info.variantId, sku, oldProductId: info.productId })
+        }
+      } else {
+        // Product doesn't exist yet - ALL existing variants are on wrong parents
+        variantsNeedingReparent.push({ variantId: info.variantId, sku, oldProductId: info.productId })
+      }
+    }
+
+    if (variantsNeedingReparent.length > 0) {
+      logger.info(`[${parentSKU}] Detected ${variantsNeedingReparent.length} variants that need reparenting`)
+      variantsNeedingReparent.forEach(v => {
+        logger.debug(`[${parentSKU}]   - ${v.sku}: moving from product ${v.oldProductId}`)
+      })
+
+      const reparentResult = await handleVariantReparenting(variantsNeedingReparent, parentSKU, context, logger, scope)
+
+      // Remove reparented SKUs from existingSkus so they'll be recreated under the new product
+      for (const v of variantsNeedingReparent) {
+        if (!reparentResult.errors.some(e => e.includes(v.sku))) {
+          existingSkus.delete(v.sku)
+          existingVariantInfo.delete(v.sku)
+        }
+      }
+
+      logger.info(`[${parentSKU}] Reparenting complete: ${reparentResult.movedCount} moved, ${reparentResult.errors.length} errors`)
     }
 
     let product: any
@@ -1870,6 +2260,9 @@ export async function importParentGroup(
             logger.debug(`[${parentSKU}]   ToCreate ${idx}: SKU="${v.sku}", product_id="${v.product_id}"`)
           })
 
+          // Ensure product options include all needed values before adding variants
+          await ensureProductOptionValues(productId!, variantsToCreate, parentSKU, logger, scope)
+
           await batchProductVariantsWorkflow(scope).run({
             input: {
               create: variantsToCreate,
@@ -1937,6 +2330,9 @@ export async function importParentGroup(
             variantsToCreate.forEach((v, idx) => {
               logger.debug(`[${parentSKU}]   ToCreate ${idx}: SKU="${v.sku}", product_id="${v.product_id}"`)
             })
+
+            // Ensure product options include all needed values before adding variants
+            await ensureProductOptionValues(productId!, variantsToCreate, parentSKU, logger, scope)
 
             await batchProductVariantsWorkflow(scope).run({
               input: {
@@ -2073,6 +2469,9 @@ export async function importParentGroup(
                     ...v,
                     product_id: productId
                   }))
+
+                  // Ensure product options include all needed values before adding variants
+                  await ensureProductOptionValues(productId!, variantsToCreate, parentSKU, logger, scope)
 
                   await batchProductVariantsWorkflow(scope).run({
                     input: {
